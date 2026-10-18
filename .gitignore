@@ -1,1 +1,16 @@
+# secrets
+.env
+
+# local data (SQLite DB, Chroma store)
+data/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# tooling scratch
 .superpowers/
+checks.py

@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: compileall
+        name: compile all Python files (same as hackathon check)
+        entry: uv run python -m compileall -q app tests
+        language: system
+        pass_filenames: false
+        types: [python]

@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run python .claude/hooks/check_py_edit.py",
+            "timeout": 60,
+            "statusMessage": "Lint + Python 3.11 compile check"
+          }
+        ]
+      }
+    ]
+  }
+}

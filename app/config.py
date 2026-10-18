@@ -1,0 +1,60 @@
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Every LLM / embedding / moderation call must go through Mesh (hackathon rule).
+MESH_BASE_URL = "https://api.meshapi.ai/v1"
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", protected_namespaces=())
+
+    mesh_api_key: str = ""
+    mesh_base_url: str = MESH_BASE_URL
+    tavily_api_key: str = ""
+
+    data_dir: Path = Path("data")
+    database_url: str = "sqlite:///data/deepdive.db"
+
+    # One model per agent role; the verifier must come from a different family than the drafter.
+    model_planner: str = "openai/gpt-5-nano"
+    model_drafter: str = "openai/gpt-5-nano"
+    model_synthesizer: str = "openai/gpt-5-nano"
+    model_contradictions: str = "openai/gpt-5-nano"
+    model_verifier: str = "anthropic/claude-haiku-5.5"
+    model_judge: str = "google/gemini-2.5-flash-lite"
+    model_embed: str = "google/embeddinggemma-300m"
+    model_moderation: str = "openai/omni-moderation-latest"
+
+    min_supported_claims: int = 2
+    max_extra_rounds: int = 2
+    quote_match_threshold: int = 90
+
+    search_results_per_query: int = 5
+    chunk_words: int = 600
+    chunk_overlap_words: int = 75
+    max_chunks_per_source: int = 40
+    top_k_chunks: int = 6
+
+    llm_max_retries: int = 3
+    llm_concurrency: int = 8
+
+    demo_access_code: str = ""  # empty = no access gate
+    runs_per_hour: int = 10
+    max_concurrent_runs: int = 2
+
+    @model_validator(mode="after")
+    def _verifier_family_differs(self) -> "Settings":
+        if self.model_drafter.split("/")[0] == self.model_verifier.split("/")[0]:
+            raise ValueError(
+                "model_verifier must be from a different model family than model_drafter "
+                f"(got {self.model_drafter!r} and {self.model_verifier!r})"
+            )
+        return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
