@@ -26,6 +26,7 @@ from app.config import get_settings
 from app.deps import Deps, build_deps
 from app.graph.nodes.verifier import verify_claim
 from app.graph.runner import MODEL_ROLES, create_run, run_research
+from app.llm import LlmOutputError
 from app.models import Event, Report, Run, SubQuestion, Verdict
 from eval.common import load_claims
 from eval.judge import judge_claim
@@ -141,7 +142,11 @@ def run_stats(deps: Deps, run_ids: list[str]) -> dict:
             "unpriced_runs": len(costs) - len(known_costs),
         },
         "latency_s": summarize(
-            [s for r in runs if (s := _seconds(r.created_at, r.finished_at)) is not None]
+            [
+                s
+                for r in runs
+                if (s := _seconds(r.started_at or r.created_at, r.finished_at)) is not None
+            ]
         ),
         "tokens": {
             "prompt": sum(r.prompt_tokens for r in runs),
@@ -155,7 +160,10 @@ async def _mutant(row, kinds: tuple[MutationKind, ...], start: int, deps, rng):
     for k in range(len(kinds)):
         kind = kinds[(start + k) % len(kinds)]
         if kind == "entity":
-            text = await entity_swap(row.claim.text, deps.llm)
+            try:
+                text = await entity_swap(row.claim.text, deps.llm)
+            except LlmOutputError:
+                text = None
         else:
             text = mutate_claim(row.claim.text, kind, rng)
         if text and text != row.claim.text:
@@ -207,12 +215,21 @@ async def judge_reports(deps: Deps, run_ids: list[str], rng: random.Random, max_
     rows = [r for r in load_claims(deps, run_ids) if r.claim.id in cited]
     rng.shuffle(rows)
     rows = rows[:max_claims]
-    outs = await asyncio.gather(*(judge_claim(deps.llm, r.claim.text, r.source_text) for r in rows))
+    outs = await asyncio.gather(*(_judge_or_none(deps, r) for r in rows))
+    judged = [o for o in outs if o is not None]
     return {
         "model": deps.settings.model_judge,
-        "n": len(rows),
-        "groundedness": sum(o.supported for o in outs) / len(outs) if outs else None,
+        "n": len(judged),
+        "errors": len(outs) - len(judged),
+        "groundedness": sum(o.supported for o in judged) / len(judged) if judged else None,
     }
+
+
+async def _judge_or_none(deps: Deps, row):
+    try:
+        return await judge_claim(deps.llm, row.claim.text, row.source_text)
+    except LlmOutputError:
+        return None
 
 
 def gold_stats(deps: Deps, gold_path: Path) -> dict:

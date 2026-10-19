@@ -27,7 +27,8 @@ LETTERS = ("A", "B", "C")
 def _page(letter: str, round_: int) -> str:
     return (
         f"Evidence for {letter} round {round_}: analysts reported two separate findings about "
-        f"topic {letter}, the first on supply and the second on prices."
+        f"topic {letter}, the first on supply and the second on prices. The report describes "
+        f"its method, the period covered and the organisations that contributed data."
     )
 
 
@@ -92,7 +93,7 @@ def _synthesizer(cite_rejected: bool):
     def handler(system: str, user: str):
         ids = [int(x) for x in re.findall(r"\[claim:(\d+)\]", user)]
         paragraphs = [
-            Paragraph(text=f"Finding backed by claim {cid}.", claim_ids=[cid]) for cid in ids
+            Paragraph(text="Finding backed by a verified claim.", claim_ids=[cid]) for cid in ids
         ]
         if cite_rejected:
             paragraphs.append(Paragraph(text="B fact 2 round 0", claim_ids=[99999]))

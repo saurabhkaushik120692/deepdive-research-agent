@@ -1,3 +1,5 @@
+import re
+
 from langchain_core.runnables import RunnableConfig
 from sqlmodel import select
 
@@ -15,6 +17,18 @@ def _evidence_block(rows: list[tuple[EvidenceChunk, Source]]) -> str:
     )
 
 
+def claim_key(text: str) -> str:
+    """Identity of a claim for de-duplication: case, spacing and punctuation ignored."""
+    return " ".join(re.sub(r"[^a-z0-9%]+", " ", text.lower()).split())
+
+
+def _previous_block(previous: list[str]) -> str:
+    if not previous:
+        return ""
+    lines = "\n".join(f"- {t}" for t in previous)
+    return f"\n\nAlready drafted for this sub-question (do NOT repeat these):\n{lines}"
+
+
 async def draft_node(state: ResearchState, config: RunnableConfig) -> dict:
     """Turn retrieved evidence into atomic claims, each citing the chunk(s) it came from."""
     deps = get_deps(config)
@@ -23,6 +37,10 @@ async def draft_node(state: ResearchState, config: RunnableConfig) -> dict:
         for sq_id in state["pending_sq_ids"]:
             with deps.session_factory() as session:
                 sq_text = session.get(SubQuestion, sq_id).text
+                previous = session.exec(
+                    select(Claim.text).where(Claim.sub_question_id == sq_id).order_by(Claim.id)
+                ).all()
+            seen = {claim_key(t) for t in previous}
             chunk_ids = await deps.vectors.query(run_id, sq_id, sq_text, deps.settings.top_k_chunks)
             with deps.session_factory() as session:
                 rows = session.exec(
@@ -42,7 +60,7 @@ async def draft_node(state: ResearchState, config: RunnableConfig) -> dict:
                 user=(
                     f"Research question: {state['question']}\n"
                     f"Sub-question (id {sq_id}): {sq_text}\n\n"
-                    f"Evidence:\n\n{_evidence_block(rows)}"
+                    f"Evidence:\n\n{_evidence_block(rows)}" + _previous_block(previous)
                 ),
                 schema=DraftOutput,
                 run_id=run_id,
@@ -60,6 +78,17 @@ async def draft_node(state: ResearchState, config: RunnableConfig) -> dict:
                             {"sub_question_id": sq_id, "text": c.text, "chunk_ids": c.chunk_ids},
                         )
                         continue
+                    if claim_key(c.text) in seen:
+                        # A re-research round must not re-count facts already drafted.
+                        log_event(
+                            session,
+                            run_id,
+                            "drafter",
+                            "claim_dropped_duplicate",
+                            {"sub_question_id": sq_id, "text": c.text},
+                        )
+                        continue
+                    seen.add(claim_key(c.text))
                     session.add(
                         Claim(
                             run_id=run_id,

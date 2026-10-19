@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import time
 from collections.abc import Callable
 from typing import Literal, Protocol, TypeVar
@@ -22,6 +23,16 @@ _TRANSIENT = (
     openai.RateLimitError,
     openai.InternalServerError,
 )
+
+
+EMBED_BATCH = 64
+_FENCE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.DOTALL)
+
+
+def _strip_fences(content: str) -> str:
+    """Some models wrap JSON in ```json fences even in JSON mode."""
+    m = _FENCE.match(content)
+    return m.group(1) if m else content
 
 
 class LlmOutputError(Exception):
@@ -55,8 +66,12 @@ class MeshLlm:
     ) -> None:
         self.settings = settings
         # A missing key must not crash startup (health checks, tests); calls fail with 401 instead.
+        # SDK retries are off: _call() owns the retry policy, and the timeout bounds a hung call.
         self.client = client or AsyncOpenAI(
-            base_url=settings.mesh_base_url, api_key=settings.mesh_api_key or "MESH_API_KEY-not-set"
+            base_url=settings.mesh_base_url,
+            api_key=settings.mesh_api_key or "MESH_API_KEY-not-set",
+            timeout=settings.llm_timeout_s,
+            max_retries=0,
         )
         self.on_usage = on_usage
         self.retry_base_delay = retry_base_delay
@@ -95,7 +110,7 @@ class MeshLlm:
             self._report_usage(run_id, role, model, resp, started)
             content = resp.choices[0].message.content or ""
             try:
-                return schema.model_validate_json(content)
+                return schema.model_validate_json(_strip_fences(content))
             except ValidationError as e:
                 last_error = str(e)
             if attempt == 0:
@@ -125,12 +140,16 @@ class MeshLlm:
         )
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        if not texts:
-            return []
-        resp = await self._call(
-            self.client.embeddings.create, model=self.settings.model_embed, input=texts
-        )
-        return [item.embedding for item in resp.data]
+        """Embed in batches: embedding endpoints cap inputs/tokens per request."""
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), EMBED_BATCH):
+            resp = await self._call(
+                self.client.embeddings.create,
+                model=self.settings.model_embed,
+                input=texts[start : start + EMBED_BATCH],
+            )
+            vectors += [item.embedding for item in resp.data]
+        return vectors
 
     async def moderate(self, text: str) -> bool:
         resp = await self._call(

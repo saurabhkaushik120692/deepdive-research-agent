@@ -9,11 +9,18 @@ from app.events import log_event
 from app.graph.nodes import get_deps, node_events
 from app.models import EvidenceChunk, SearchRecord, Source, SubQuestion
 from app.tools.chunking import chunk_text
+from app.tools.fetch import MIN_TEXT_CHARS
 from app.tools.tiers import source_tier
 
 
 async def _page_text(deps: Deps, result: SearchResult) -> str | None:
-    return result.content or await deps.fetcher.fetch_text(result.url)
+    """Tavily's raw content if it's a real page, else fetch it; any error skips the source."""
+    if result.content and len(result.content) >= MIN_TEXT_CHARS:
+        return result.content
+    try:
+        return await deps.fetcher.fetch_text(result.url)
+    except Exception:
+        return None
 
 
 async def research_node(payload: dict, config: RunnableConfig) -> dict:

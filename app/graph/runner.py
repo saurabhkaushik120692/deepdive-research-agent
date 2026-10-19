@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 
 from sqlmodel import Session, select
@@ -28,6 +29,7 @@ async def run_research(run_id: str, deps: Deps) -> None:
     with deps.session_factory() as session:
         run = session.get(Run, run_id)
         run.status = "running"
+        run.started_at = datetime.now(UTC)
         session.add(run)
         session.commit()
         question = run.question
@@ -45,9 +47,16 @@ async def run_research(run_id: str, deps: Deps) -> None:
             },
             {"configurable": {"deps": deps}, "recursion_limit": 50},
         )
+    except asyncio.CancelledError:
+        _finish(deps, run_id, "failed", "run cancelled: server shutting down")
+        raise
     except Exception as e:  # recorded, not re-raised: runs execute as background tasks
         status, error = "failed", f"{type(e).__name__}: {e}"
+    _finish(deps, run_id, status, error)
 
+
+def _finish(deps: Deps, run_id: str, status: str, error: str | None) -> None:
+    """Record the final status, timing and token totals, plus a run_completed/run_failed event."""
     with deps.session_factory() as session:
         usage = session.exec(
             select(Event.payload).where(Event.run_id == run_id, Event.type == "llm_call")
@@ -63,3 +72,13 @@ async def run_research(run_id: str, deps: Deps) -> None:
             log_event(session, run_id, "runner", "run_failed", {"error": error})
         else:
             log_event(session, run_id, "runner", "run_completed", {})
+
+
+def fail_interrupted_runs(deps: Deps) -> int:
+    """On startup: runs left queued/running by a restart can never finish, so close them."""
+    with deps.session_factory() as session:
+        stuck = session.exec(select(Run).where(Run.status.in_(["queued", "running"]))).all()
+        ids = [r.id for r in stuck]
+    for run_id in ids:
+        _finish(deps, run_id, "failed", "interrupted by server restart")
+    return len(ids)

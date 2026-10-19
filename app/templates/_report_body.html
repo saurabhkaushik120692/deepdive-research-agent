@@ -34,7 +34,7 @@
 
   {% if view.thin %}
     <h2>Limited evidence</h2>
-    <p>These sub-questions could not be answered with verified evidence, so the report says nothing about them rather than guessing:</p>
+    <p>These sub-questions have limited verified evidence (fewer than two supported claims), so treat what the report says about them as incomplete:</p>
     <ul>{% for t in view.thin %}<li>{{ t }}</li>{% endfor %}</ul>
   {% endif %}
 

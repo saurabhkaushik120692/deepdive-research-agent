@@ -34,20 +34,29 @@ class HttpFetcher:
         if cached is not None:
             return cached or None
 
-        text = await self._fetch(url)
-        with self.session_factory() as session:
-            cache_put(session, key, text or "")
+        text, permanent = await self._fetch(url)
+        if text is not None or permanent:
+            # Transient failures (timeouts, 429, 5xx, network errors) are not cached, so a
+            # momentary blip doesn't remove a URL from every future run.
+            with self.session_factory() as session:
+                cache_put(session, key, text or "")
         return text
 
-    async def _fetch(self, url: str) -> str | None:
+    async def _fetch(self, url: str) -> tuple[str | None, bool]:
+        """Returns (text, failure_is_permanent)."""
         try:
             resp = await self.http.get(url)
-        except httpx.HTTPError:
-            return None
+        except Exception:  # any network/URL error: skip this source, never fail the run
+            return None, False
+        if resp.status_code == 429 or resp.status_code >= 500:
+            return None, False
         ctype = resp.headers.get("content-type", "").lower()
         if not resp.is_success or not ctype.startswith(_HTML_TYPES):
-            return None
-        text = await asyncio.to_thread(trafilatura.extract, resp.text)
+            return None, True
+        try:
+            text = await asyncio.to_thread(trafilatura.extract, resp.text)
+        except Exception:
+            return None, True
         if not text or len(text) < MIN_TEXT_CHARS:
-            return None
-        return text
+            return None, True
+        return text, True

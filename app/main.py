@@ -7,11 +7,13 @@ from fastapi.staticfiles import StaticFiles
 from app.api import guard, pages, runs
 from app.config import Settings, get_settings
 from app.deps import Deps, build_deps
+from app.graph.runner import fail_interrupted_runs
 
 
 def create_app(settings: Settings | None = None, deps: Deps | None = None) -> FastAPI:
     settings = settings or get_settings()
     deps = deps or build_deps(settings)
+    fail_interrupted_runs(deps)  # in-process runs don't survive a restart or redeploy
 
     app = FastAPI(title="DeepDive Research Agent", version="0.1.0")
     app.state.settings = settings

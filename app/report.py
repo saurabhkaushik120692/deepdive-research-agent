@@ -57,8 +57,8 @@ def render_report(
         lines += [
             "## Limited evidence",
             "",
-            "These sub-questions could not be answered with verified evidence, so the report says "
-            "nothing about them rather than guessing:",
+            "These sub-questions have limited verified evidence (fewer than two supported "
+            "claims), so treat what the report says about them as incomplete:",
             "",
         ]
         lines += [f"- {t}" for t in thin_sq_texts] + [""]

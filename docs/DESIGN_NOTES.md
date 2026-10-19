@@ -10,16 +10,23 @@ Short notes on the choices that shape DeepDive, and why. The full design is in
   about one sentence and one piece of text.
 - **The verifier must quote, and code checks the quote.** LLM verifiers can hallucinate support
   as easily as writers hallucinate facts. `quote_in_chunk` normalizes text (quotes, spaces, case),
-  tries an exact match, then fuzzy matching for long quotes, and requires every number in the
-  quote to appear in the source. A one-digit change otherwise scores ~97% similar and would pass.
-  A failed check turns the verdict into `unsupported`.
+  tries a punctuation-insensitive exact match, then fuzzy matching for long quotes, and requires
+  every number in the quote to appear in the source. A one-digit change otherwise scores ~97%
+  similar and would pass. The fuzzy fallback may not change meaning: every quoted word must occur
+  in the matched source passage, with the same negations ("was not effective" never matches "was
+  effective"). A failed check turns the verdict into `unsupported`.
 - **Fail closed.** An unparseable verifier reply rejects that claim instead of passing it.
 - **Cross-family verifier.** The drafter and verifier come from different model families
   (`openai/*` vs `anthropic/*`), enforced by a settings validator, so a model doesn't approve
   its own style of mistake.
 - **Drafter and Synthesizer are separate agents.** The synthesizer only ever receives verified
-  claims, and code drops any paragraph citing a claim outside that set. Unverified facts can't
-  slip into the prose after verification.
+  claims. Code then drops any paragraph that cites a claim outside that set, or that states a
+  number or year its cited claims don't contain; the summary gets the same figure check. The
+  prose wording itself is not verified word for word: a paragraph can still mis-phrase its
+  claims, which is why every paragraph carries its citations and the claims are kept in the trail.
+- **Re-research can't count the same fact twice.** Later rounds tell the drafter what was already
+  drafted, and claims matching an existing one (ignoring case and punctuation) are dropped, so a
+  thin sub-question only passes the loop rule with genuinely new supported facts.
 
 ## The loop
 

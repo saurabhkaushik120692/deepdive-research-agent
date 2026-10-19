@@ -49,7 +49,8 @@ SQLite, and embeddings live in Chroma.
    sub-question with fewer than 2 supported claims goes back to research with a refined query,
    up to 2 extra rounds. If it's still thin, the report says so under *Limited evidence* rather
    than padding.
-4. **Drafter ≠ Synthesizer.** The writer of the final prose never sees unverified claims.
+4. **Drafter ≠ Synthesizer.** The writer of the final prose never sees unverified claims, and code
+   drops any paragraph citing an unverified claim or stating a figure its cited claims don't contain.
 5. **Source-quality tiers** (official/academic → major news → other) order the evidence the
    drafter sees and are shown in the report.
 
@@ -109,6 +110,8 @@ Design decisions and trade-offs: [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md).
 - Single instance: runs execute as in-process background tasks (max 2 at once); no job queue.
 - Search depends on Tavily's raw page content, falling back to direct fetching. PDFs and
   paywalled pages are skipped, not read.
+- Claims are verified; the synthesizer's wording is only checked for citations and figures, so a
+  paragraph can still mis-phrase the claims it cites (its citations make that checkable).
 - The verifier checks support against the cited chunk, not whether the source itself is correct.
   Source tiers and contradiction flags help, but a wrong official figure stays wrong.
 - Eval questions are answered from the live web, so numbers vary between runs. Search results are

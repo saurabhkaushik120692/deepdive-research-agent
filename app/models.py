@@ -26,6 +26,7 @@ class Run(SQLModel, table=True):
     models: dict = Field(default_factory=dict, sa_column=Column(JSON))
     error: str | None = None
     created_at: datetime = Field(default_factory=_now)
+    started_at: datetime | None = None
     finished_at: datetime | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0

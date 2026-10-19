@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     llm_max_retries: int = 3
     llm_concurrency: int = 8
+    llm_timeout_s: float = 60.0
 
     demo_access_code: str = ""  # empty = no access gate
     runs_per_hour: int = 10

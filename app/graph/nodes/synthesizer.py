@@ -5,11 +5,13 @@ from sqlmodel import select
 
 from app.events import log_event
 from app.graph.nodes import get_deps, node_events
-from app.graph.schemas import Conflict, SynthesisOutput
+from app.graph.schemas import Conflict, Paragraph, Section, SynthesisOutput
 from app.graph.state import ResearchState
+from app.llm import LlmOutputError
 from app.models import Claim, Event, EvidenceChunk, Report, Source, SubQuestion, Verdict
 from app.prompts import load_prompt
 from app.report import render_report
+from app.tools.quote_match import NUMBER, normalize
 
 VERIFIED = ("supported", "partial")
 
@@ -28,6 +30,36 @@ def _claims_prompt(question, sub_questions, verified, verdicts, chunk_sources) -
             partial = " (partial)" if verdicts[c.id].label == "partial" else ""
             parts.append(f"[claim:{c.id}] (tier {tier}){partial} {c.text}")
     return "\n".join(parts)
+
+
+def _numbers(text: str) -> set[str]:
+    return set(NUMBER.findall(normalize(text)))
+
+
+def _paragraph_problem(p, allowed: set[int], claims: dict[int, Claim]) -> str | None:
+    """Why a paragraph can't go in the report, or None. Prose may reword its claims, but it may
+    only cite verified claims, and every figure it states must come from those claims."""
+    if not set(p.claim_ids) <= allowed:
+        return "cites unverified claims"
+    cited_numbers = set().union(*(_numbers(claims[i].text) for i in p.claim_ids))
+    extra = _numbers(p.text) - cited_numbers
+    if extra:
+        return f"numbers not in cited claims: {sorted(extra)}"
+    return None
+
+
+def _fallback_synthesis(question, sub_questions, verified) -> SynthesisOutput:
+    sections = []
+    for sq in sub_questions:
+        rows = [c for c in verified if c.sub_question_id == sq.id]
+        if rows:
+            paragraphs = [Paragraph(text=c.text, claim_ids=[c.id]) for c in rows]
+            sections.append(Section(heading=sq.text, paragraphs=paragraphs))
+    return SynthesisOutput(
+        title=question,
+        summary="The verified findings are listed below, grouped by sub-question.",
+        sections=sections,
+    )
 
 
 async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
@@ -69,14 +101,19 @@ async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
         ]
         allowed = {c.id for c in verified}
 
+        fallback = False
         if verified:
-            synthesis = await deps.llm.chat_json(
-                role="synthesizer",
-                system=load_prompt("synthesizer"),
-                user=_claims_prompt(question, sub_questions, verified, verdicts, chunk_sources),
-                schema=SynthesisOutput,
-                run_id=run_id,
-            )
+            try:
+                synthesis = await deps.llm.chat_json(
+                    role="synthesizer",
+                    system=load_prompt("synthesizer"),
+                    user=_claims_prompt(question, sub_questions, verified, verdicts, chunk_sources),
+                    schema=SynthesisOutput,
+                    run_id=run_id,
+                )
+            except LlmOutputError:
+                # The claims are already verified: list them rather than lose the run.
+                synthesis, fallback = _fallback_synthesis(question, sub_questions, verified), True
         else:
             synthesis = SynthesisOutput(
                 title=question,
@@ -86,10 +123,24 @@ async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
             )
 
         with deps.session_factory() as session:
+            if fallback:
+                log_event(session, run_id, "synthesizer", "synthesis_fallback", {})
+            all_numbers = set().union(*(_numbers(c.text) for c in verified))
+            if not _numbers(synthesis.summary) <= all_numbers:
+                log_event(
+                    session,
+                    run_id,
+                    "synthesizer",
+                    "summary_replaced",
+                    {"text": synthesis.summary, "reason": "numbers not in verified claims"},
+                )
+                synthesis.summary = "Summary withheld: it stated figures that no verified claim "
+                synthesis.summary += "supports. See the findings below."
             for section in synthesis.sections:
                 kept = []
                 for p in section.paragraphs:
-                    if set(p.claim_ids) <= allowed:
+                    reason = _paragraph_problem(p, allowed, claims)
+                    if reason is None:
                         kept.append(p)
                     else:
                         log_event(
@@ -97,7 +148,7 @@ async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
                             run_id,
                             "synthesizer",
                             "paragraph_dropped",
-                            {"text": p.text, "claim_ids": p.claim_ids},
+                            {"text": p.text, "claim_ids": p.claim_ids, "reason": reason},
                         )
                 section.paragraphs = kept
             synthesis.sections = [s for s in synthesis.sections if s.paragraphs]
