@@ -1,0 +1,14 @@
+# Local run: docker compose up --build   →   http://localhost:8000
+services:
+  app:
+    build: .
+    image: deepdive-research-agent:local
+    env_file: .env            # secrets come from here at runtime, never from the image
+    environment:
+      DATA_DIR: /app/data
+      DATABASE_URL: sqlite:////app/data/deepdive.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data      # SQLite + Chroma survive rebuilds and redeploys
+    restart: unless-stopped

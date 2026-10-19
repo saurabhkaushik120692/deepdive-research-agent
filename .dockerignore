@@ -1,10 +1,14 @@
 .env
 data/
 .git/
+.github/
 .venv/
-tests/
-eval/results/
+.claude/
 .superpowers/
+tests/
+docs/
+deploy/
+scripts/
 __pycache__/
 *.pyc
 .pytest_cache/
