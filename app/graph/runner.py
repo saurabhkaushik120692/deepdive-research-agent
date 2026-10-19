@@ -1,0 +1,65 @@
+from datetime import UTC, datetime
+
+from sqlmodel import Session, select
+
+from app.config import Settings
+from app.deps import Deps
+from app.events import log_event
+from app.graph.build import build_graph
+from app.models import Event, Run
+
+MODEL_ROLES = ("planner", "drafter", "verifier", "synthesizer", "contradictions", "embed")
+
+
+def create_run(session: Session, question: str, settings: Settings) -> Run:
+    run = Run(
+        question=question,
+        status="queued",
+        models={role: getattr(settings, f"model_{role}") for role in MODEL_ROLES},
+    )
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    return run
+
+
+async def run_research(run_id: str, deps: Deps) -> None:
+    """Execute one research run end to end. Never raises: failures are recorded on the run."""
+    with deps.session_factory() as session:
+        run = session.get(Run, run_id)
+        run.status = "running"
+        session.add(run)
+        session.commit()
+        question = run.question
+        log_event(session, run_id, "runner", "run_started", {"question": question})
+
+    status, error = "completed", None
+    try:
+        await build_graph().ainvoke(
+            {
+                "run_id": run_id,
+                "question": question,
+                "round": 0,
+                "pending_sq_ids": [],
+                "researched": [],
+            },
+            {"configurable": {"deps": deps}, "recursion_limit": 50},
+        )
+    except Exception as e:  # recorded, not re-raised: runs execute as background tasks
+        status, error = "failed", f"{type(e).__name__}: {e}"
+
+    with deps.session_factory() as session:
+        usage = session.exec(
+            select(Event.payload).where(Event.run_id == run_id, Event.type == "llm_call")
+        ).all()
+        run = session.get(Run, run_id)
+        run.status, run.error = status, error
+        run.finished_at = datetime.now(UTC)
+        run.prompt_tokens = sum(u.get("prompt_tokens", 0) for u in usage)
+        run.completion_tokens = sum(u.get("completion_tokens", 0) for u in usage)
+        session.add(run)
+        session.commit()
+        if status == "failed":
+            log_event(session, run_id, "runner", "run_failed", {"error": error})
+        else:
+            log_event(session, run_id, "runner", "run_completed", {})
