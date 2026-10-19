@@ -48,3 +48,10 @@ def deps(settings, engine):
         vectors=MemoryVectors(),
         session_factory=lambda: _Session(engine),
     )
+
+
+@pytest.fixture
+def session_factory(engine):
+    from sqlmodel import Session as _Session
+
+    return lambda: _Session(engine)
