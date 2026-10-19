@@ -136,3 +136,32 @@ def test_eval_page_without_results(client):
 def test_report_fragment_is_bare(client, seeded_run):
     html = client.get(f"/runs/{seeded_run.id}/report?fragment=1").text
     assert "<html" not in html and "<title>" not in html and 'class="cite"' in html
+
+
+def test_eval_page_shows_tiles_and_kind_bars(client, tmp_path, monkeypatch):
+    import json
+
+    import app.api.pages as pages
+
+    results = {
+        "generated_at": "2026-10-27 10:00 UTC",
+        "n_questions": 24,
+        "runs": {"total": 24, "completed": 23, "failed": 1, "failed_ids": ["x"]},
+        "verifier_probe": {
+            "catch_rate": 0.9,
+            "n_mutants": 40,
+            "wrongful_rejection_rate": 0.05,
+            "n_originals": 40,
+            "catch_rate_by_kind": {"number": 0.95, "negation": 0.8},
+            "n_mutants_by_kind": {"number": 20, "negation": 20},
+        },
+        "independent_judge": {"model": "google/x", "n": 100, "groundedness": 0.93},
+        "gold": {"n_labelled": 50, "accuracy": 0.88, "kappa": 0.74},
+        "quote_validity_rate": 0.97,
+    }
+    (tmp_path / "20261027T100000Z.json").write_text(json.dumps(results))
+    (tmp_path / "runs.json").write_text("[]")
+    monkeypatch.setattr(pages, "EVAL_RESULTS", tmp_path)
+    html = client.get("/eval").text
+    assert "90.0%" in html and "93.0%" in html and "0.74" in html
+    assert 'data-kind="number"' in html and 'data-kind="negation"' in html

@@ -1,11 +1,52 @@
 {% extends "base.html" %}
 {% block title %}Self-evaluation{% endblock %}
+{% macro pct(x) %}{{ "n/a" if x is none else "%.1f%%" | format(x * 100) }}{% endmacro %}
 {% block content %}
-<h2>Self-evaluation</h2>
+<hgroup>
+  <h2>Self-evaluation</h2>
+  <p>How well does the verifier actually work? Measured on {{ results.n_questions if results else "the" }} test questions. Full table and method in <code>eval/RESULTS.md</code>.</p>
+</hgroup>
 {% if not results %}
   <p>No eval results yet. Run <code>uv run python -m eval.run</code> to produce them.</p>
 {% else %}
-  <p class="muted">Generated {{ results.get("generated_at", "") }}</p>
-  <pre>{{ results | tojson(indent=2) }}</pre>
+  {% set p = results.verifier_probe %}
+  {% set j = results.independent_judge %}
+  {% set g = results.gold %}
+  <p class="muted"><small>Generated {{ results.generated_at }} · runs completed {{ results.runs.completed }}/{{ results.runs.total }}</small></p>
+
+  <div class="tiles">
+    <article class="tile">
+      <small>Verifier catch rate</small>
+      <strong>{{ pct(p.catch_rate) }}</strong>
+      <small class="muted">of {{ p.n_mutants }} planted false claims rejected</small>
+    </article>
+    <article class="tile">
+      <small>Wrongful rejections</small>
+      <strong>{{ pct(p.wrongful_rejection_rate) }}</strong>
+      <small class="muted">of {{ p.n_originals }} true claims re-checked</small>
+    </article>
+    <article class="tile">
+      <small>Independent groundedness</small>
+      <strong>{{ pct(j.groundedness) }}</strong>
+      <small class="muted">{{ j.n }} report claims, judged by {{ j.model }}</small>
+    </article>
+    <article class="tile">
+      <small>Agreement with hand labels</small>
+      <strong>{{ pct(g.accuracy) }}</strong>
+      <small class="muted">κ = {{ "n/a" if g.kappa is none else "%.2f" | format(g.kappa) }} · {{ g.n_labelled }} labels</small>
+    </article>
+  </div>
+
+  <h3>Catch rate by kind of planted error</h3>
+  <figure class="bars" aria-label="Verifier catch rate by mutation kind">
+    {% for kind, rate in p.catch_rate_by_kind.items() %}
+      <div class="bar-row" data-kind="{{ kind }}">
+        <span class="bar-label">{{ kind }}</span>
+        <span class="bar-track"><span class="bar-fill" style="width: {{ (rate or 0) * 100 }}%"></span></span>
+        <span class="bar-value">{{ pct(rate) }} <small class="muted">n={{ p.n_mutants_by_kind[kind] }}</small></span>
+      </div>
+    {% endfor %}
+  </figure>
+  <p class="muted"><small>number: a figure changed · year: a date shifted · negation: direction flipped (rose↔fell, is↔is not) · entity: a different organisation or country named.</small></p>
 {% endif %}
 {% endblock %}

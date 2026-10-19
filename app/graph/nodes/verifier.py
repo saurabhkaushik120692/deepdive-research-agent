@@ -16,18 +16,28 @@ from app.tools.quote_match import quote_in_chunk
 QUOTE_NOT_FOUND = "verifier quote not found in source"
 
 
-async def _judge(deps: Deps, run_id: str, claim: Claim, source_text: str) -> VerdictOutput:
+async def verify_claim(
+    deps: Deps, run_id: str | None, claim_text: str, source_text: str
+) -> tuple[VerdictOutput, bool]:
+    """LLM verdict + deterministic quote check. Shared by the graph and the eval probes.
+
+    Returns the final verdict and whether the quote was found in the source text.
+    """
     try:
-        return await deps.llm.chat_json(
+        out = await deps.llm.chat_json(
             role="verifier",
             system=load_prompt("verifier"),
-            user=f"Claim:\n{claim.text}\n\nSource text:\n{source_text}",
+            user=f"Claim:\n{claim_text}\n\nSource text:\n{source_text}",
             schema=VerdictOutput,
             run_id=run_id,
         )
     except LlmOutputError as e:
         # Unparseable verdict: fail closed for this claim instead of failing the whole run.
-        return VerdictOutput(label="unsupported", quote="", reason=f"verifier error: {e}")
+        return VerdictOutput(label="unsupported", quote="", reason=f"verifier error: {e}"), False
+    found = quote_in_chunk(out.quote, source_text, deps.settings.quote_match_threshold)
+    if out.label != "unsupported" and not found:
+        out = VerdictOutput(label="unsupported", quote=out.quote, reason=QUOTE_NOT_FOUND)
+    return out, found
 
 
 async def verify_node(state: ResearchState, config: RunnableConfig) -> dict:
@@ -49,16 +59,13 @@ async def verify_node(state: ResearchState, config: RunnableConfig) -> dict:
                 ).all()
                 texts[c.id] = "\n\n".join(ch.text for ch in chunks)
 
-        outs = await asyncio.gather(*(_judge(deps, run_id, c, texts[c.id]) for c in claims))
+        outs = await asyncio.gather(
+            *(verify_claim(deps, run_id, c.text, texts[c.id]) for c in claims)
+        )
 
         with deps.session_factory() as session:
-            for claim, out in zip(claims, outs, strict=True):
-                found = quote_in_chunk(
-                    out.quote, texts[claim.id], deps.settings.quote_match_threshold
-                )
+            for claim, (out, found) in zip(claims, outs, strict=True):
                 label, reason = out.label, out.reason
-                if label != "unsupported" and not found:
-                    label, reason = "unsupported", QUOTE_NOT_FOUND
                 session.add(
                     Verdict(
                         claim_id=claim.id,
