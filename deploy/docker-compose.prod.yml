@@ -1,0 +1,32 @@
+# Production stack on EC2 (lives at /opt/deepdive/docker-compose.prod.yml).
+# The deploy workflow exports ECR_REGISTRY, ECR_REPOSITORY and IMAGE_TAG before `pull` / `up`.
+services:
+  app:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+      DATABASE_URL: sqlite:////app/data/deepdive.db
+    volumes:
+      - /opt/deepdive/data:/app/data
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env          # provides SITE_HOST, e.g. 13-201-5-7.nip.io
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

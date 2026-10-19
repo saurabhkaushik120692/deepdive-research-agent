@@ -1,0 +1,8 @@
+# Automatic HTTPS for SITE_HOST (e.g. 13-201-5-7.nip.io resolves to the Elastic IP 13.201.5.7).
+{$SITE_HOST} {
+	encode gzip
+	reverse_proxy app:8000 {
+		# stream Server-Sent Events (live agent timeline) without buffering
+		flush_interval -1
+	}
+}
