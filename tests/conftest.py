@@ -55,3 +55,29 @@ def session_factory(engine):
     from sqlmodel import Session as _Session
 
     return lambda: _Session(engine)
+
+
+@pytest.fixture
+def run(deps):
+    from app.models import Run
+
+    with deps.session_factory() as s:
+        r = Run(question="What are the main risks of investing in EV batteries in 2026?", models={})
+        s.add(r)
+        s.commit()
+        s.refresh(r)
+        return r
+
+
+@pytest.fixture
+def sq(deps, run):
+    from app.models import SubQuestion
+
+    with deps.session_factory() as s:
+        q = SubQuestion(
+            run_id=run.id, text="How big is the market?", query="EV battery market size"
+        )
+        s.add(q)
+        s.commit()
+        s.refresh(q)
+        return q
