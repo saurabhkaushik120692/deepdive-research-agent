@@ -22,6 +22,6 @@ def init_db(engine: Engine) -> None:
 
 
 def get_session(request: Request) -> Iterator[Session]:
-    """FastAPI dependency; the engine is created once in create_app()."""
-    with Session(request.app.state.engine) as session:
+    """FastAPI dependency; the engine is created once by build_deps() in create_app()."""
+    with request.app.state.deps.session_factory() as session:
         yield session
