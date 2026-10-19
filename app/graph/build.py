@@ -1,7 +1,7 @@
 """The coordinator: a LangGraph StateGraph wiring the agents together, with a real loop.
 
-START → plan →(Send per sub-question) research → draft → verify →(route) refine | synthesize
-refine →(Send per thin sub-question) research   ·   synthesize → END
+START → plan →(Send per sub-question) research → draft → verify →(route) refine | contradictions
+refine →(Send per thin sub-question) research   ·   contradictions → synthesize → END
 """
 
 from typing import Literal
@@ -13,6 +13,7 @@ from sqlmodel import select
 
 from app.events import log_event
 from app.graph.nodes import get_deps
+from app.graph.nodes.contradictions import contradictions_node
 from app.graph.nodes.drafter import draft_node
 from app.graph.nodes.planner import plan_node, refine_node
 from app.graph.nodes.researcher import research_node
@@ -35,7 +36,7 @@ def dispatch_research(state: ResearchState) -> list[Send]:
 
 def route_after_verify(
     state: ResearchState, config: RunnableConfig
-) -> Literal["refine", "synthesize"]:
+) -> Literal["refine", "contradictions"]:
     """Plain-code loop rule: re-research sub-questions with too few supported claims."""
     deps = get_deps(config)
     run_id, round_ = state["run_id"], state["round"]
@@ -62,7 +63,7 @@ def route_after_verify(
             "loop_decision",
             {"thin_ids": thin, "round": round_, "looping": looping, "supported_counts": counts},
         )
-    return "refine" if looping else "synthesize"
+    return "refine" if looping else "contradictions"
 
 
 def build_graph():
@@ -72,6 +73,7 @@ def build_graph():
     g.add_node("draft", draft_node)
     g.add_node("verify", verify_node)
     g.add_node("refine", refine_node)
+    g.add_node("contradictions", contradictions_node)
     g.add_node("synthesize", synthesize_node)
 
     g.add_edge(START, "plan")
@@ -79,8 +81,9 @@ def build_graph():
     g.add_edge("research", "draft")
     g.add_edge("draft", "verify")
     g.add_conditional_edges(
-        "verify", route_after_verify, {"refine": "refine", "synthesize": "synthesize"}
+        "verify", route_after_verify, {"refine": "refine", "contradictions": "contradictions"}
     )
     g.add_conditional_edges("refine", dispatch_research, ["research"])
+    g.add_edge("contradictions", "synthesize")
     g.add_edge("synthesize", END)
     return g.compile()

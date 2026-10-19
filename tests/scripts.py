@@ -9,6 +9,7 @@ import re
 
 from app.deps import SearchResult
 from app.graph.schemas import (
+    ContradictionOutput,
     DraftClaim,
     DraftOutput,
     Paragraph,
@@ -113,6 +114,7 @@ def script_happy_path(
         drafter=_drafter,
         verifier=_verifier(set(thin_in_round0), set(always_thin)),
         synthesizer=_synthesizer(synth_cites_rejected),
+        contradictions=lambda system, user: ContradictionOutput(conflicts=[]),
     )
 
 
