@@ -220,7 +220,7 @@ Persistence: SQLite file and Chroma directory under `/app/data`, mounted as a Do
 - **Local = prod:** the same `Dockerfile` (multi-stage, `python:3.11-slim`, uv) and `docker-compose.yml` with a `./data:/app/data` volume.
 - **Pipeline (`.github/workflows/deploy.yml`)**, separate from the hackathon checks workflow: push to `main` → ruff + pytest → build image → push to **ECR** tagged with the commit SHA → deploy to EC2 through **AWS SSM Run Command** (`docker compose pull && up -d`). Plain SSH is the fallback.
 - **AWS auth from GitHub:** **OIDC** role (no long-lived AWS keys in GitHub).
-- **EC2:** t3.small, **Elastic IP**, region **ap-south-1 (Mumbai)** [my call]. Optional **Caddy** reverse proxy for automatic HTTPS through a `nip.io`-style hostname.
+- **EC2:** t3.small, **Elastic IP**, region **ap-southeast-2 (Sydney)** [my call]. Optional **Caddy** reverse proxy for automatic HTTPS through a `nip.io`-style hostname.
 - **Secrets on the instance:** `.env` on the host or SSM Parameter Store; never in the image or the repo.
 - **AWS account is new:** the owner creates it personally, then immediately sets a **$10 budget alert** and root MFA, and uses an IAM identity for daily work.
 - **Timing:** a "hello world" deploy on day 2–3, then time-boxed. Deployment isn't a judging criterion; a deployed URL is only reviewed for shortlisted teams.

@@ -270,7 +270,7 @@ Dockerfile, docker-compose.yml, .dockerignore, pyproject.toml, uv.lock, requirem
 
 **Interfaces:**
 - Consumes: the image from Task 4.
-- Produces: on push to `main`, jobs `test` (same steps as ci.yml) → `build-push` (tag `${{ github.sha }}` and `latest`) → `deploy` (SSM `send-command` running `cd /opt/deepdive && IMAGE_TAG=<sha> docker compose -f docker-compose.prod.yml pull && ... up -d`). GitHub repo variables: `AWS_REGION=ap-south-1`, `AWS_ROLE_ARN`, `ECR_REPOSITORY=deepdive-research-agent`, `EC2_INSTANCE_ID`.
+- Produces: on push to `main`, jobs `test` (same steps as ci.yml) → `build-push` (tag `${{ github.sha }}` and `latest`) → `deploy` (SSM `send-command` running `cd /opt/deepdive && IMAGE_TAG=<sha> docker compose -f docker-compose.prod.yml pull && ... up -d`). GitHub repo variables: `AWS_REGION=ap-southeast-2`, `AWS_ROLE_ARN`, `ECR_REPOSITORY=deepdive-research-agent`, `EC2_INSTANCE_ID`.
 
 - [ ] **Step 1:** Write `docs/DEPLOY.md` as a click-by-click runbook the **owner** follows in the AWS console:
   - add the IAM OIDC provider `token.actions.githubusercontent.com`

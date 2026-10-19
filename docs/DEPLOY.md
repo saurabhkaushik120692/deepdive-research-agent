@@ -7,7 +7,7 @@ free automatic HTTPS on a `nip.io` hostname.
 Until the GitHub repository variables in step 7 exist, the `deploy` workflow only runs the tests
 (build and deploy jobs are skipped), so it's safe to push before AWS is ready.
 
-Region used below: **ap-south-1 (Mumbai)**. Replace `<ACCOUNT_ID>` with your 12-digit account id
+Region used below: **ap-southeast-2 (Sydney)**. Replace `<ACCOUNT_ID>` with your 12-digit account id
 (top-right menu in the AWS console) and `<GH_USER>` with `saurabhkaushik120692`.
 
 ---
@@ -18,7 +18,7 @@ Root MFA on, $10 budget alert on. Do the steps below as an IAM admin user, not r
 ## 1. ECR repository
 Console → **Elastic Container Registry → Create repository**
 - Visibility: Private · Name: `deepdive-research-agent` · everything else default.
-- (Optional, saves money) **Lifecycle policy**: expire untagged images, keep last 10.
+- (Optional, saves money) **Lifecycle policy**: expire untagged images, keep the last 3 (the free plan includes 500 MB of private ECR storage and each image is ~400 MB compressed).
 
 ## 2. GitHub OIDC identity provider (once per account)
 Console → **IAM → Identity providers → Add provider**
@@ -62,10 +62,10 @@ Add an **inline policy** (Permissions → Add permissions → Create inline poli
     {"Effect": "Allow",
      "Action": ["ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
                 "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
-     "Resource": "arn:aws:ecr:ap-south-1:<ACCOUNT_ID>:repository/deepdive-research-agent"},
+     "Resource": "arn:aws:ecr:ap-southeast-2:<ACCOUNT_ID>:repository/deepdive-research-agent"},
     {"Effect": "Allow", "Action": "ssm:SendCommand",
-     "Resource": ["arn:aws:ec2:ap-south-1:<ACCOUNT_ID>:instance/<INSTANCE_ID>",
-                  "arn:aws:ssm:ap-south-1::document/AWS-RunShellScript"]},
+     "Resource": ["arn:aws:ec2:ap-southeast-2:<ACCOUNT_ID>:instance/<INSTANCE_ID>",
+                  "arn:aws:ssm:ap-southeast-2::document/AWS-RunShellScript"]},
     {"Effect": "Allow", "Action": ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"], "Resource": "*"}
   ]
 }
@@ -113,7 +113,7 @@ GitHub → repo **Settings → Secrets and variables → Actions → Variables**
 
 | Name | Value |
 |---|---|
-| `AWS_REGION` | `ap-south-1` |
+| `AWS_REGION` | `ap-southeast-2` |
 | `AWS_ROLE_ARN` | `arn:aws:iam::<ACCOUNT_ID>:role/deepdive-github-deploy` |
 | `ECR_REPOSITORY` | `deepdive-research-agent` |
 | `EC2_INSTANCE_ID` | `i-…` |
