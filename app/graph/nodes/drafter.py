@@ -1,0 +1,81 @@
+from langchain_core.runnables import RunnableConfig
+from sqlmodel import select
+
+from app.events import log_event
+from app.graph.nodes import get_deps, node_events
+from app.graph.schemas import DraftOutput
+from app.graph.state import ResearchState
+from app.models import Claim, EvidenceChunk, Source, SubQuestion
+from app.prompts import load_prompt
+
+
+def _evidence_block(rows: list[tuple[EvidenceChunk, Source]]) -> str:
+    return "\n\n".join(
+        f"[chunk:{ch.id}] (source: {src.domain}, tier {src.tier})\n{ch.text}" for ch, src in rows
+    )
+
+
+async def draft_node(state: ResearchState, config: RunnableConfig) -> dict:
+    """Turn retrieved evidence into atomic claims, each citing the chunk(s) it came from."""
+    deps = get_deps(config)
+    run_id, round_ = state["run_id"], state["round"]
+    with node_events(deps, run_id, "drafter", round=round_):
+        for sq_id in state["pending_sq_ids"]:
+            with deps.session_factory() as session:
+                sq_text = session.get(SubQuestion, sq_id).text
+            chunk_ids = await deps.vectors.query(run_id, sq_id, sq_text, deps.settings.top_k_chunks)
+            with deps.session_factory() as session:
+                rows = session.exec(
+                    select(EvidenceChunk, Source)
+                    .join(Source, Source.id == EvidenceChunk.source_id)
+                    .where(EvidenceChunk.id.in_(chunk_ids))
+                ).all()
+                if not rows:
+                    log_event(session, run_id, "drafter", "no_evidence", {"sub_question_id": sq_id})
+                    continue
+            rows = sorted(rows, key=lambda r: (r[1].tier, chunk_ids.index(r[0].id)))
+            given = {ch.id for ch, _ in rows}
+
+            draft = await deps.llm.chat_json(
+                role="drafter",
+                system=load_prompt("drafter"),
+                user=(
+                    f"Research question: {state['question']}\n"
+                    f"Sub-question (id {sq_id}): {sq_text}\n\n"
+                    f"Evidence:\n\n{_evidence_block(rows)}"
+                ),
+                schema=DraftOutput,
+                run_id=run_id,
+            )
+
+            with deps.session_factory() as session:
+                kept = 0
+                for c in draft.claims:
+                    if not set(c.chunk_ids) <= given:
+                        log_event(
+                            session,
+                            run_id,
+                            "drafter",
+                            "claim_dropped_bad_citation",
+                            {"sub_question_id": sq_id, "text": c.text, "chunk_ids": c.chunk_ids},
+                        )
+                        continue
+                    session.add(
+                        Claim(
+                            run_id=run_id,
+                            sub_question_id=sq_id,
+                            text=c.text,
+                            chunk_ids=c.chunk_ids,
+                            round=round_,
+                        )
+                    )
+                    kept += 1
+                session.commit()
+                log_event(
+                    session,
+                    run_id,
+                    "drafter",
+                    "claims_drafted",
+                    {"sub_question_id": sq_id, "n_claims": kept},
+                )
+    return {}
