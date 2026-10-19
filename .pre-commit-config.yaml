@@ -9,7 +9,7 @@ repos:
     hooks:
       - id: compileall
         name: compile all Python files (same as hackathon check)
-        entry: uv run python -m compileall -q app tests
+        entry: uv run python -m compileall -q app tests scripts
         language: system
         pass_filenames: false
         types: [python]

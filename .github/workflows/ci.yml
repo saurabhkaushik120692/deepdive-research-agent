@@ -12,5 +12,5 @@ jobs:
           python-version: "3.11"
       - run: uv sync --frozen
       - run: uv run ruff check .
-      - run: uv run python -m compileall -q app tests
+      - run: uv run python -m compileall -q app tests scripts
       - run: uv run pytest -q

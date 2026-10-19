@@ -24,3 +24,10 @@ def engine():
 def session(engine):
     with Session(engine) as s:
         yield s
+
+
+@pytest.fixture
+def settings():
+    from app.config import Settings
+
+    return Settings(_env_file=None, mesh_api_key="rsk_test", tavily_api_key="tvly_test")
