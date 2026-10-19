@@ -13,7 +13,7 @@ uv sync                                   # install (Python 3.11 is pinned)
 uv run pytest -q                          # all tests (no network; fakes in tests/fakes.py)
 uv run pytest tests/test_config.py::test_mesh_base_url_literal -q   # single test
 uv run ruff check . && uv run ruff format .                         # lint + format
-uv run python -m compileall -q app tests  # same compile check the hackathon CI runs on 3.11
+uv run python -m compileall -q app eval tests scripts  # same compile check the hackathon CI runs on 3.11
 uv run uvicorn app.main:create_app --factory --reload               # dev server
 uv export --no-hashes --no-dev -o requirements.txt                  # after ANY dependency change
 ```
