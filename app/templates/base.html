@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}DeepDive{% endblock %} · DeepDive Research Agent</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/print.css" media="print">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js"></script>
+</head>
+<body>
+  <header class="container no-print">
+    <nav>
+      <ul><li><a href="/" class="brand"><strong>DeepDive</strong></a> <small class="muted">self-verifying research</small></li></ul>
+      <ul>
+        <li><a href="/">Ask</a></li>
+        <li><a href="/eval">Eval</a></li>
+        <li><a href="/docs">API</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="container no-print muted">
+    <small>Every claim is checked against the exact source text it cites. Unsupported claims are removed and listed.</small>
+  </footer>
+</body>
+</html>

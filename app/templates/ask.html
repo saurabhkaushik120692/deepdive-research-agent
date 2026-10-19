@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Ask{% endblock %}
+{% block content %}
+<hgroup>
+  <h1>Ask a research question</h1>
+  <p>A planner splits it into sub-questions, researchers gather sources, and a verifier checks every claim against the exact text it cites before anything reaches the report.</p>
+</hgroup>
+
+<form id="ask-form">
+  <textarea name="question" rows="3" minlength="10" maxlength="500" required
+    placeholder="e.g. What are the main risks of investing in the EV battery market in 2026?"></textarea>
+  <small id="ask-error" class="error" role="alert"></small>
+  <button type="submit" id="ask-btn">Start research</button>
+</form>
+
+{% if recent %}
+<h3>Recent runs</h3>
+<table>
+  <thead><tr><th>Question</th><th>Status</th><th>Started</th></tr></thead>
+  <tbody>
+  {% for r in recent %}
+    <tr>
+      <td><a href="/runs/{{ r.id }}">{{ r.question }}</a></td>
+      <td><span class="badge status-{{ r.status }}">{{ r.status }}</span></td>
+      <td><small>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</small></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<script>
+document.getElementById("ask-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("ask-btn");
+  const err = document.getElementById("ask-error");
+  err.textContent = "";
+  btn.setAttribute("aria-busy", "true");
+  const question = new FormData(e.target).get("question").trim();
+  try {
+    const r = await fetch("/api/runs", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question}),
+    });
+    if (r.status === 202) {
+      const {run_id} = await r.json();
+      window.location = `/runs/${run_id}`;
+      return;
+    }
+    if (r.status === 401) { window.location = "/"; return; }
+    const body = await r.json().catch(() => ({}));
+    const detail = Array.isArray(body.detail) ? "Question must be 10-500 characters." : body.detail;
+    err.textContent = detail || `Request failed (${r.status})`;
+  } catch {
+    err.textContent = "Network error, please try again.";
+  }
+  btn.removeAttribute("aria-busy");
+});
+</script>
+{% endblock %}

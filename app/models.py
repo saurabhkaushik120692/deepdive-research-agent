@@ -101,6 +101,8 @@ class Report(SQLModel, table=True):
     run_id: str = Field(foreign_key="run.id", primary_key=True)
     markdown: str
     metrics: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    # Final (filtered) SynthesisOutput, so the HTML view can link each citation to its quote.
+    synthesis: dict = Field(default_factory=dict, sa_column=Column(JSON))
 
 
 class CacheEntry(SQLModel, table=True):

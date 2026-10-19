@@ -1,0 +1,62 @@
+{% if not view %}
+  <p>No report yet for this run (status: {{ run.status }}).</p>
+{% else %}
+<article class="report">
+  <header>
+    <h1>{{ view.synthesis.title }}</h1>
+    <p class="muted"><em>Question:</em> {{ run.question }}</p>
+    <p class="no-print">
+      <button class="secondary outline" onclick="window.print()">Save as PDF</button>
+      <a href="/runs/{{ run.id }}/trail" role="button" class="secondary outline">Audit trail</a>
+    </p>
+    {% if view.metrics %}
+    <p class="stats">
+      <span class="badge good">{{ view.metrics.supported }} supported</span>
+      <span class="badge warn">{{ view.metrics.partial }} partial</span>
+      <span class="badge bad">{{ view.metrics.unsupported }} rejected</span>
+      <span class="badge">{{ view.metrics.sources }} sources</span>
+      <span class="badge">{{ view.metrics.rounds }} extra research round(s)</span>
+    </p>
+    {% endif %}
+  </header>
+
+  <p class="summary">{{ view.synthesis.summary }}</p>
+
+  {% for s in view.sections %}
+    <h2>{{ s.heading }}</h2>
+    {% for p in s.paragraphs %}
+      <p>{{ p.text }}
+        {%- for c in p.cites %} <a class="cite" href="{{ c.url }}" target="_blank" rel="noopener" title="&ldquo;{{ c.quote }}&rdquo;">[{{ c.n }}]</a>{% endfor %}
+        {%- if p.partial %} <span class="badge warn">⚠ partially verified</span>{% endif %}
+      </p>
+    {% endfor %}
+  {% endfor %}
+
+  {% if view.thin %}
+    <h2>Limited evidence</h2>
+    <p>These sub-questions could not be answered with verified evidence, so the report says nothing about them rather than guessing:</p>
+    <ul>{% for t in view.thin %}<li>{{ t }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if view.conflicts %}
+    <h2>Conflicting sources</h2>
+    <ul>{% for c in view.conflicts %}<li>&ldquo;{{ c.a }}&rdquo; vs &ldquo;{{ c.b }}&rdquo;: {{ c.explanation }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <h2>Rejected claims</h2>
+  {% if view.rejected %}
+    <p class="muted">Drafted, then removed because the cited source did not support them.</p>
+    <ul class="rejected">{% for r in view.rejected %}<li><s>{{ r.text }}</s> <small>{{ r.reason }}</small></li>{% endfor %}</ul>
+  {% else %}
+    <p>None. Every drafted claim was supported by its cited source.</p>
+  {% endif %}
+
+  <h2>Sources</h2>
+  <ol class="sources">
+    {% for n, s in view.sources %}
+      <li value="{{ n }}"><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.title or s.domain }}</a>
+        <span class="badge tier-{{ s.tier }}">tier {{ s.tier }}</span> <small class="muted url">{{ s.url }}</small></li>
+    {% endfor %}
+  </ol>
+</article>
+{% endif %}

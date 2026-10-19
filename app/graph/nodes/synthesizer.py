@@ -116,7 +116,14 @@ async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
                 "sources": len(all_sources),
                 "tier_counts": {str(t): n for t, n in Counter(s.tier for s in all_sources).items()},
             }
-            session.merge(Report(run_id=run_id, markdown=markdown, metrics=metrics))
+            session.merge(
+                Report(
+                    run_id=run_id,
+                    markdown=markdown,
+                    metrics=metrics,
+                    synthesis=synthesis.model_dump(),
+                )
+            )
             session.commit()
             log_event(session, run_id, "synthesizer", "report_written", metrics)
     return {}

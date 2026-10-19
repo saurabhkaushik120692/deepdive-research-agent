@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Run{% endblock %}
+{% block content %}
+<hgroup>
+  <h2>{{ run.question }}</h2>
+  <p><span id="run-status" class="badge status-{{ run.status }}">{{ run.status }}</span>
+     · <a href="/runs/{{ run.id }}/trail">audit trail</a></p>
+</hgroup>
+
+<details open class="no-print">
+  <summary>Live agent timeline</summary>
+  <ol id="timeline" class="timeline" data-events-url="/api/runs/{{ run.id }}/events"></ol>
+</details>
+
+<div id="report" aria-live="polite"></div>
+
+<script>
+(() => {
+  const list = document.getElementById("timeline");
+  const statusEl = document.getElementById("run-status");
+  const add = (text, cls = "") => {
+    const li = document.createElement("li");
+    li.className = cls;
+    li.textContent = text;
+    list.appendChild(li);
+  };
+  const fmt = {
+    run_started: () => ["Run started"],
+    sub_questions_planned: (d) => [`Planner: ${d.sub_questions.length} sub-questions: ` + d.sub_questions.map((q) => `#${q.id} ${q.text}`).join(" · ")],
+    search_done: (d) => [`Researcher #${d.sub_question_id} (round ${d.round}): "${d.query}" gave ${d.n_results} results, ${d.n_new_chunks} new evidence chunks`],
+    source_skipped: (d) => [`Researcher #${d.sub_question_id}: skipped ${d.url} (${d.reason})`, "muted"],
+    no_evidence: (d) => [`Drafter #${d.sub_question_id}: no evidence to draft from`, "warn"],
+    claims_drafted: (d) => [`Drafter #${d.sub_question_id}: ${d.n_claims} claims drafted`],
+    claim_dropped_bad_citation: (d) => [`Drafter: dropped "${d.text}" (cited evidence it wasn't given)`, "bad"],
+    claim_verified: (d) => [`Verifier: claim ${d.claim_id} is ${d.label.toUpperCase()}: ${d.reason}`, d.label === "unsupported" ? "bad" : d.label === "partial" ? "warn" : "good"],
+    loop_decision: (d) => d.looping
+      ? [`Loop: sub-questions ${d.thin_ids.map((i) => "#" + i).join(", ")} have too little verified support, researching again (round ${d.round + 1})`, "warn"]
+      : [d.thin_ids.length ? `Loop limit reached; ${d.thin_ids.length} sub-question(s) stay thin` : "Every sub-question has enough verified support, writing report", "good"],
+    query_refined: (d) => [`Refine #${d.sub_question_id}: "${d.old_query}" → "${d.new_query}"`],
+    paragraph_dropped: (d) => [`Synthesizer: dropped a paragraph citing unverified claims`, "bad"],
+    conflict_found: (d) => [`Conflict between claims ${d.claim_a} and ${d.claim_b}: ${d.explanation}`, "warn"],
+    report_written: (d) => [`Report written: ${d.supported} supported, ${d.partial} partial, ${d.unsupported} rejected`, "good"],
+    run_completed: () => ["Run completed", "good"],
+    run_failed: (d) => [`Run failed: ${d.error}`, "bad"],
+  };
+  const es = new EventSource(list.dataset.eventsUrl);
+  for (const [type, f] of Object.entries(fmt)) {
+    es.addEventListener(type, (e) => { const [t, c] = f(JSON.parse(e.data)); add(t, c); });
+  }
+  es.addEventListener("done", (e) => {
+    es.close();
+    const {status} = JSON.parse(e.data);
+    statusEl.textContent = status;
+    statusEl.className = `badge status-${status}`;
+    if (status === "completed") {
+      htmx.ajax("GET", "/runs/{{ run.id }}/report?fragment=1", "#report");
+    }
+  });
+})();
+</script>
+{% endblock %}

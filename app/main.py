@@ -1,8 +1,10 @@
 import asyncio
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
-from app.api import guard, runs
+from app.api import guard, pages, runs
 from app.config import Settings, get_settings
 from app.deps import Deps, build_deps
 
@@ -23,4 +25,6 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
 
     app.include_router(guard.router)
     app.include_router(runs.router)
+    app.include_router(pages.router)
+    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
     return app

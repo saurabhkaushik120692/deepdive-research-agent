@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Self-evaluation{% endblock %}
+{% block content %}
+<h2>Self-evaluation</h2>
+{% if not results %}
+  <p>No eval results yet. Run <code>uv run python -m eval.run</code> to produce them.</p>
+{% else %}
+  <p class="muted">Generated {{ results.get("generated_at", "") }}</p>
+  <pre>{{ results | tojson(indent=2) }}</pre>
+{% endif %}
+{% endblock %}

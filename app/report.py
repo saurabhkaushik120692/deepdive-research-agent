@@ -6,6 +6,29 @@ from app.models import Claim, Source, Verdict
 PARTIAL_MARKER = "⚠ partially verified"
 
 
+class Citations:
+    """Numbers sources in order of first citation; shared by the markdown and HTML views."""
+
+    def __init__(self, claims: dict[int, Claim], chunk_sources: dict[int, Source]) -> None:
+        self.claims, self.chunk_sources = claims, chunk_sources
+        self.numbers: dict[str, int] = {}
+        self.cited: list[Source] = []
+
+    def sources_for(self, claim_id: int) -> list[tuple[int, Source]]:
+        out: list[tuple[int, Source]] = []
+        for chunk_id in self.claims[claim_id].chunk_ids:
+            src = self.chunk_sources.get(chunk_id)
+            if src is None:
+                continue
+            if src.url not in self.numbers:
+                self.numbers[src.url] = len(self.numbers) + 1
+                self.cited.append(src)
+            n = self.numbers[src.url]
+            if all(n != m for m, _ in out):
+                out.append((n, src))
+        return out
+
+
 def render_report(
     question: str,
     synthesis: SynthesisOutput,
@@ -15,21 +38,7 @@ def render_report(
     thin_sq_texts: list[str],
     conflicts: list[Conflict],
 ) -> str:
-    numbers: dict[str, int] = {}  # source url -> citation number, in order of first citation
-    cited: list[Source] = []
-
-    def cite(claim_id: int) -> list[int]:
-        out = []
-        for chunk_id in claims[claim_id].chunk_ids:
-            src = chunk_sources.get(chunk_id)
-            if src is None:
-                continue
-            if src.url not in numbers:
-                numbers[src.url] = len(numbers) + 1
-                cited.append(src)
-            if numbers[src.url] not in out:
-                out.append(numbers[src.url])
-        return out
+    citations = Citations(claims, chunk_sources)
 
     lines = [f"# {synthesis.title}", "", f"*Question:* {question}", "", synthesis.summary, ""]
 
@@ -38,7 +47,7 @@ def render_report(
         for p in section.paragraphs:
             refs: list[int] = []
             for cid in p.claim_ids:
-                refs += [n for n in cite(cid) if n not in refs]
+                refs += [n for n, _ in citations.sources_for(cid) if n not in refs]
             text = p.text + (" " + "".join(f"[{n}]" for n in refs) if refs else "")
             if any(verdicts[cid].label == "partial" for cid in p.claim_ids if cid in verdicts):
                 text += f" {PARTIAL_MARKER}"
@@ -71,5 +80,8 @@ def render_report(
     lines.append("")
 
     lines += ["## Sources", ""]
-    lines += [f"[{numbers[s.url]}] {s.title or s.domain} ({s.url}), tier {s.tier}" for s in cited]
+    lines += [
+        f"[{citations.numbers[s.url]}] {s.title or s.domain} ({s.url}), tier {s.tier}"
+        for s in citations.cited
+    ]
     return "\n".join(lines).rstrip() + "\n"
