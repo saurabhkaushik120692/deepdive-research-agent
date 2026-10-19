@@ -1,6 +1,12 @@
 """Test doubles. Tests never touch the network."""
 
+import hashlib
+from collections.abc import Callable
 from types import SimpleNamespace
+
+from pydantic import BaseModel
+
+from app.deps import SearchResult
 
 
 class _FakeChatCompletions:
@@ -50,3 +56,66 @@ class FakeOpenAI:
         self.chat = SimpleNamespace(completions=_FakeChatCompletions(self))
         self.embeddings = _FakeEmbeddings(self)
         self.moderations = _FakeModerations(self)
+
+
+# --- graph-level fakes -------------------------------------------------------
+
+
+class ScriptedLlm:
+    """LlmClient double: per-role handler(system, user) -> schema instance (or Exception)."""
+
+    def __init__(self, handlers: dict[str, Callable[[str, str], object]] | None = None):
+        self.handlers = handlers or {}
+        self.calls: list[tuple[str, str]] = []
+        self.flagged = False
+
+    async def chat_json(self, *, role, system, user, schema, run_id=None):
+        self.calls.append((role, user))
+        if role not in self.handlers:
+            raise AssertionError(f"ScriptedLlm has no handler for role {role!r}")
+        out = self.handlers[role](system, user)
+        if isinstance(out, Exception):
+            raise out
+        assert isinstance(out, BaseModel)
+        return out
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        vecs = []
+        for t in texts:
+            digest = hashlib.sha256(t.encode()).digest()
+            vecs.append([b / 255 for b in digest[:8]])
+        return vecs
+
+    async def moderate(self, text: str) -> bool:
+        return self.flagged
+
+
+class FakeSearch:
+    def __init__(self, results: dict[str, list[SearchResult]] | None = None):
+        self.results = results or {}
+        self.queries: list[str] = []
+
+    async def search(self, query: str, max_results: int) -> list[SearchResult]:
+        self.queries.append(query)
+        return list(self.results.get(query, []))[:max_results]
+
+
+class FakeFetcher:
+    def __init__(self, pages: dict[str, str | None] | None = None):
+        self.pages = pages or {}
+
+    async def fetch_text(self, url: str) -> str | None:
+        return self.pages.get(url)
+
+
+class MemoryVectors:
+    """Returns the first k chunk ids stored for (run, sub-question), in insertion order."""
+
+    def __init__(self):
+        self.store: dict[tuple[str, int], list[int]] = {}
+
+    async def add(self, run_id, sub_question_id, chunk_ids, texts):
+        self.store.setdefault((run_id, sub_question_id), []).extend(chunk_ids)
+
+    async def query(self, run_id, sub_question_id, text, k):
+        return self.store.get((run_id, sub_question_id), [])[:k]

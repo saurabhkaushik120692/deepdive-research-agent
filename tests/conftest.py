@@ -31,3 +31,20 @@ def settings():
     from app.config import Settings
 
     return Settings(_env_file=None, mesh_api_key="rsk_test", tavily_api_key="tvly_test")
+
+
+@pytest.fixture
+def deps(settings, engine):
+    from sqlmodel import Session as _Session
+
+    from app.deps import Deps
+    from tests.fakes import FakeFetcher, FakeSearch, MemoryVectors, ScriptedLlm
+
+    return Deps(
+        settings=settings,
+        llm=ScriptedLlm(),
+        search=FakeSearch(),
+        fetcher=FakeFetcher(),
+        vectors=MemoryVectors(),
+        session_factory=lambda: _Session(engine),
+    )
