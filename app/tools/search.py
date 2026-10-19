@@ -13,7 +13,9 @@ class TavilySearch:
     """Raw web search results only. Tavily's LLM 'answer' feature is never used (Mesh rule)."""
 
     def __init__(self, settings: Settings, session_factory: Callable[[], Session], client=None):
-        self.client = client or AsyncTavilyClient(api_key=settings.tavily_api_key)
+        self.client = client or AsyncTavilyClient(
+            api_key=settings.tavily_api_key or "TAVILY_API_KEY-not-set"
+        )
         self.session_factory = session_factory
 
     async def search(self, query: str, max_results: int) -> list[SearchResult]:

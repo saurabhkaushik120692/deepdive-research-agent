@@ -54,8 +54,9 @@ class MeshLlm:
         retry_base_delay: float = 1.0,
     ) -> None:
         self.settings = settings
+        # A missing key must not crash startup (health checks, tests); calls fail with 401 instead.
         self.client = client or AsyncOpenAI(
-            base_url=settings.mesh_base_url, api_key=settings.mesh_api_key
+            base_url=settings.mesh_base_url, api_key=settings.mesh_api_key or "MESH_API_KEY-not-set"
         )
         self.on_usage = on_usage
         self.retry_base_delay = retry_base_delay
