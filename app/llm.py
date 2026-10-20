@@ -154,7 +154,8 @@ class MeshLlm:
                 last_error = str(e)
             if attempt == 0:
                 messages = messages + [
-                    {"role": "assistant", "content": content},
+                    # Anthropic rejects empty content blocks, so an empty reply gets a placeholder.
+                    {"role": "assistant", "content": content.strip() or "(empty reply)"},
                     {
                         "role": "user",
                         "content": "Your previous reply was not valid for the schema:\n"

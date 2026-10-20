@@ -187,6 +187,14 @@ async def _mutant(row, kinds: tuple[MutationKind, ...], start: int, deps, rng):
     return None
 
 
+async def _safe_verify(deps: Deps, text: str, source: str):
+    """Verify one claim for the probe; an API error is counted, not fatal to the whole eval."""
+    try:
+        return await verify_claim(deps, None, text, source)
+    except Exception:
+        return None
+
+
 async def verifier_probe(
     deps: Deps, run_ids: list[str], rng: random.Random, kinds=KINDS, max_claims: int = 60
 ) -> dict:
@@ -194,7 +202,7 @@ async def verifier_probe(
     rng.shuffle(rows)
     rows = rows[:max_claims]
     originals = await asyncio.gather(
-        *(verify_claim(deps, None, r.claim.text, r.source_text) for r in rows)
+        *(_safe_verify(deps, r.claim.text, r.source_text) for r in rows)
     )
     mutants = []
     if kinds:
@@ -202,12 +210,17 @@ async def verifier_probe(
             m = await _mutant(r, tuple(kinds), i, deps, rng)
             if m:
                 mutants.append((m[0], m[1], r.source_text))
-    verdicts = await asyncio.gather(*(verify_claim(deps, None, t, src) for _, t, src in mutants))
+    raw = await asyncio.gather(*(_safe_verify(deps, t, src) for _, t, src in mutants))
+    errors = sum(o is None for o in originals) + sum(v is None for v in raw)
+    originals = [o for o in originals if o is not None]
+    judged = [(m, v) for m, v in zip(mutants, raw, strict=True) if v is not None]
+    mutants, verdicts = [m for m, _ in judged], [v for _, v in judged]
     by_kind: dict[str, list[str]] = {}
     for (kind, _, _), (out, _) in zip(mutants, verdicts, strict=True):
         by_kind.setdefault(kind, []).append(out.label)
     return {
         "n_originals": len(rows),
+        "errors": errors,
         "wrongful_rejection_rate": wrongful_rejection_rate([o.label for o, _ in originals]),
         "n_mutants": len(mutants),
         "catch_rate": catch_rate([out.label for out, _ in verdicts]),
@@ -312,6 +325,10 @@ def render_results_md(r: dict) -> str:
         (
             "Wrongful rejection rate (re-verified supported claims)",
             f"{_pct(p['wrongful_rejection_rate'])} of {p['n_originals']}",
+        ),
+        (
+            "Probe / judge calls that errored (excluded from the rates above)",
+            f"{p.get('errors', 0)} / {j.get('errors', 0)}",
         ),
         (
             "Independent groundedness (judge: " + j["model"] + ")",

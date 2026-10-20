@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.deps import SearchResult
 from app.graph.nodes.researcher import research_node
+from app.graph.runner import create_run, run_research
 from app.llm import MeshLlm, RateLimiter
 from app.tools.chunking import is_noise
 from tests.fakes import FakeOpenAI
@@ -97,3 +98,31 @@ async def test_retry_failed_reruns_only_failed_questions(deps):
     assert new[1]["question_id"] == "q02" and new[1]["run_id"] != "bad"
     with deps.session_factory() as s:
         assert s.get(Run, new[1]["run_id"]).status == "completed"
+
+
+async def test_repair_never_sends_empty_assistant_message(settings):
+    fake = FakeOpenAI(chat=["", '{"answer": "x"}'])
+    out = await MeshLlm(settings, client=fake).chat_json(
+        role="verifier", system="s", user="u", schema=Out
+    )
+    assert out.answer == "x"
+    repair_messages = fake.chat_calls[1]["messages"]
+    assert all(m["content"].strip() for m in repair_messages)
+
+
+async def test_verifier_probe_counts_api_errors_instead_of_crashing(deps):
+    import random
+
+    from eval.run import verifier_probe
+    from tests.scripts import script_happy_path
+
+    script_happy_path(deps)
+    run = create_run(deps.session_factory(), "q", deps.settings)
+    await run_research(run.id, deps)
+
+    def broken_verifier(system, user):
+        raise RuntimeError("upstream 400")
+
+    deps.llm.handlers["verifier"] = broken_verifier
+    probe = await verifier_probe(deps, [run.id], random.Random(1), kinds=("number",))
+    assert probe["errors"] > 0 and probe["n_originals"] == 6
