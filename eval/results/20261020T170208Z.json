@@ -1,0 +1,113 @@
+{
+  "generated_at": "2026-10-20 16:59 UTC",
+  "n_questions": 24,
+  "models": {
+    "planner": "openai/gpt-5-nano",
+    "drafter": "openai/gpt-5-nano",
+    "verifier": "anthropic/claude-haiku-5.5",
+    "synthesizer": "openai/gpt-5-nano",
+    "contradictions": "openai/gpt-5-nano",
+    "embed": "google/embeddinggemma-300m",
+    "judge": "google/gemini-2.5-flash-lite"
+  },
+  "runs": {
+    "total": 24,
+    "completed": 24,
+    "failed": 0,
+    "failed_ids": []
+  },
+  "claims": {
+    "drafted": 1433,
+    "supported": 1200,
+    "partial": 125,
+    "unsupported": 108,
+    "draft_supported_rate": 0.837404047452896,
+    "draft_rejected_rate": 0.07536636427076064,
+    "report_paragraphs_dropped": 15
+  },
+  "loops": {
+    "runs_with_loop_rate": 0.20833333333333334,
+    "mean_extra_rounds": 0.20833333333333334
+  },
+  "coverage": {
+    "sub_questions": 115,
+    "ok_rate": 1.0
+  },
+  "quote_validity_rate": 0.9947447447447447,
+  "cost": {
+    "per_run_usd": {
+      "mean": 0.03887904791666667,
+      "p50": 0.03877452500000001,
+      "p95": 0.05566067499999999
+    },
+    "total_usd": 0.9330971499999999,
+    "unpriced_runs": 0
+  },
+  "latency_s": {
+    "mean": 259.8507098333333,
+    "p50": 241.68940149999997,
+    "p95": 383.41443269999996
+  },
+  "tokens": {
+    "prompt": 2883535,
+    "completion": 1599724
+  },
+  "verifier_probe": {
+    "n_originals": 60,
+    "errors": 0,
+    "wrongful_rejection_rate": 0.0,
+    "n_mutants": 54,
+    "catch_rate": 0.8703703703703703,
+    "catch_rate_by_kind": {
+      "entity": 0.7894736842105263,
+      "negation": 0.9473684210526315,
+      "number": 1.0,
+      "year": 0.7777777777777778
+    },
+    "n_mutants_by_kind": {
+      "entity": 19,
+      "negation": 19,
+      "number": 7,
+      "year": 9
+    },
+    "examples": [
+      {
+        "kind": "number",
+        "mutant": "United States had 55.0 thousand installations of industrial robots in 2023.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "negation",
+        "mutant": "For a 66% probability, the AR6 budget is not about 60 GtCO2 larger than in SR1.5.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "negation",
+        "mutant": "Priority 2 in 2026 is not Russia sanctions evasion through dual-use goods.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "entity",
+        "mutant": "The future market value of the Tesla, Inc. is expected to reach USD 206.61 billion by 2030.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "negation",
+        "mutant": "The US administration has not imposed sweeping tariff regimes and pursued remedies specifically affecting industries critical to energy storage.",
+        "label": "unsupported"
+      }
+    ]
+  },
+  "independent_judge": {
+    "model": "google/gemini-2.5-flash-lite",
+    "n": 100,
+    "errors": 0,
+    "groundedness": 0.94
+  },
+  "gold": {
+    "n_labelled": 0,
+    "accuracy": null,
+    "kappa": null
+  },
+  "eval_cost_usd": 0.05039710000000003
+}
