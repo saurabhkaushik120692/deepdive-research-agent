@@ -88,9 +88,11 @@ uv run uvicorn app.main:create_app --factory --reload   # http://localhost:8000
 
 ## Deployment
 
-GitHub Actions → ECR → EC2 (OIDC, no stored AWS keys; deploy through SSM, no SSH), with Caddy for
-HTTPS. The public demo is protected by an access code and an hourly run limit. Step-by-step:
-[`docs/DEPLOY.md`](docs/DEPLOY.md).
+GitHub Actions → ECR → EC2 (deploy through SSM, no SSH), with Caddy for HTTPS. GitHub
+authenticates with an OIDC role when available; on the AWS free plan (no IAM identity providers)
+it falls back to a deploy-only IAM user whose key can only push to this repository and send
+commands to this one instance. The public demo is protected by an access code and an hourly run
+limit. Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Project layout
 

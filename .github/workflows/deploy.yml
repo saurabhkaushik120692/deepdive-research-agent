@@ -1,14 +1,16 @@
 name: deploy
 
 # Push to main → tests → build image → push to ECR → EC2 pulls and restarts (via SSM, no SSH).
-# Build/deploy jobs are skipped until the AWS repository variables exist (see docs/DEPLOY.md).
+# AWS auth: GitHub OIDC role if vars.AWS_ROLE_ARN is set (paid plan), otherwise the scoped
+# deploy user's access keys from secrets (AWS free plan has no IAM identity providers).
+# build-push runs once vars.AWS_REGION exists; deploy once vars.EC2_INSTANCE_ID exists too.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  id-token: write   # GitHub OIDC → AWS role (no long-lived AWS keys in GitHub)
+  id-token: write   # only used when the OIDC role is configured
   contents: read
 
 concurrency:
@@ -34,7 +36,7 @@ jobs:
 
   build-push:
     needs: test
-    if: ${{ vars.AWS_ROLE_ARN != '' }}
+    if: ${{ vars.AWS_REGION != '' }}
     runs-on: ubuntu-latest
     outputs:
       registry: ${{ steps.ecr.outputs.registry }}
@@ -43,7 +45,10 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: false   # the registry URL is passed between jobs
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
       - name: Build and push image
@@ -56,12 +61,16 @@ jobs:
 
   deploy:
     needs: build-push
+    if: ${{ vars.EC2_INSTANCE_ID != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
+          mask-aws-account-id: false   # the registry URL is passed between jobs
       - name: Pull and restart on EC2 via SSM
         env:
           REGISTRY: ${{ needs.build-push.outputs.registry }}

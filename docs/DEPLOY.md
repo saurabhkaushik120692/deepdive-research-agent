@@ -1,58 +1,42 @@
-# Deploying DeepDive to AWS (EC2 + ECR, GitHub OIDC, SSM)
+# Deploying DeepDive to AWS (EC2 + ECR via GitHub Actions and SSM)
 
 Pipeline: **push to `main` → GitHub Actions runs tests → builds the Docker image → pushes it to
 ECR → tells the EC2 instance (through SSM, no SSH) to pull it and restart.** Caddy in front gives
 free automatic HTTPS on a `nip.io` hostname.
 
-Until the GitHub repository variables in step 7 exist, the `deploy` workflow only runs the tests
-(build and deploy jobs are skipped), so it's safe to push before AWS is ready.
+The workflow only goes as far as the GitHub settings allow, so it's safe to push at any point:
+tests always run; `build-push` starts once the `AWS_REGION` variable exists; `deploy` starts once
+`EC2_INSTANCE_ID` exists too (step 7).
 
 Region used below: **ap-southeast-2 (Sydney)**. Replace `<ACCOUNT_ID>` with your 12-digit account id
-(top-right menu in the AWS console) and `<GH_USER>` with `saurabhkaushik120692`.
+(top-right menu in the AWS console), `<GH_USER>` with `saurabhkaushik120692`, and `<INSTANCE_ID>`
+with the instance id from step 5.
+
+**How GitHub logs in to AWS.** On the AWS *free plan*, IAM identity providers (OIDC) are not
+available, so GitHub uses the access key of a **deploy-only IAM user** whose permissions cover just
+this ECR repository and sending commands to this one instance (steps 2–3). On a paid plan, use the
+OIDC role instead ([Appendix](#appendix-oidc-role-paid-plan)): no stored keys at all. The workflow
+supports both; it uses the role whenever the `AWS_ROLE_ARN` variable is set.
 
 ---
 
 ## 0. Account safety (done in Task 0)
-Root MFA on, $10 budget alert on. Do the steps below as an IAM admin user, not root.
+Root MFA on, $10 budget alert on.
 
 ## 1. ECR repository
 Console → **Elastic Container Registry → Create repository**
-- Visibility: Private · Name: `deepdive-research-agent` · everything else default.
-- (Optional, saves money) **Lifecycle policy**: expire untagged images, keep the last 3 (the free plan includes 500 MB of private ECR storage and each image is ~400 MB compressed).
+- Visibility: Private · Name: `deepdive-research-agent` · tag mutability: Mutable · rest default.
+- (Optional, saves money) **Lifecycle policy**: expire untagged images after 1 day and keep the
+  last 3 (the free plan includes 500 MB of private ECR storage; each image is ~400 MB compressed).
 
-## 2. GitHub OIDC identity provider (once per account)
-Console → **IAM → Identity providers → Add provider**
-- Type: OpenID Connect
-- Provider URL: `https://token.actions.githubusercontent.com`
-- Audience: `sts.amazonaws.com`
+## 2. Deploy-only IAM user
+Console → **IAM → Users → Create user**
+- User name: `deepdive-github-deploy` · **leave "Provide user access to the AWS Management Console"
+  unticked** (this user is for GitHub only, it never signs in).
+- Permissions: **Attach policies directly** → don't tick anything → Next → **Create user**.
 
-## 3. IAM role for GitHub Actions
-Console → **IAM → Roles → Create role → Web identity**
-- Identity provider: `token.actions.githubusercontent.com`, audience `sts.amazonaws.com`
-- GitHub organization: `<GH_USER>` · repository: `deepdive-research-agent` · branch: `main`
-- Skip the managed policies, name it `deepdive-github-deploy`, create.
-
-Then open the role → **Trust relationships** and check it matches (only `main` of this repo):
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"},
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-      "StringEquals": {
-        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-        "token.actions.githubusercontent.com:sub": "repo:<GH_USER>/deepdive-research-agent:ref:refs/heads/main"
-      }
-    }
-  }]
-}
-```
-
-Add an **inline policy** (Permissions → Add permissions → Create inline policy → JSON). Fill in
-`<INSTANCE_ID>` after step 5 (you can come back and edit it):
+Open the user → **Permissions → Add permissions → Create inline policy → JSON**, paste, name it
+`deepdive-deploy`:
 
 ```json
 {
@@ -62,14 +46,32 @@ Add an **inline policy** (Permissions → Add permissions → Create inline poli
     {"Effect": "Allow",
      "Action": ["ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart",
                 "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
-     "Resource": "arn:aws:ecr:ap-southeast-2:<ACCOUNT_ID>:repository/deepdive-research-agent"},
+     "Resource": "arn:aws:ecr:ap-southeast-2:<ACCOUNT_ID>:repository/deepdive-research-agent"}
+  ]
+}
+```
+
+After step 5, edit this policy and add the two SSM statements below (sending commands to *only*
+your instance, and reading their results):
+
+```json
     {"Effect": "Allow", "Action": "ssm:SendCommand",
      "Resource": ["arn:aws:ec2:ap-southeast-2:<ACCOUNT_ID>:instance/<INSTANCE_ID>",
                   "arn:aws:ssm:ap-southeast-2::document/AWS-RunShellScript"]},
     {"Effect": "Allow", "Action": ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"], "Resource": "*"}
-  ]
-}
 ```
+
+## 3. Access key → GitHub Secrets
+User → **Security credentials → Access keys → Create access key** → use case **Third-party
+service** (or "Application running outside AWS") → confirm → **Create access key**.
+
+Copy both values **straight into GitHub** (they are shown only once; never paste them anywhere
+else): GitHub → repo **Settings → Secrets and variables → Actions → Secrets → New repository secret**
+
+| Secret | Value |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | the access key id (`AKIA…`) |
+| `AWS_SECRET_ACCESS_KEY` | the secret access key |
 
 ## 4. IAM role for the EC2 instance
 Console → **IAM → Roles → Create role → AWS service → EC2**
@@ -78,13 +80,14 @@ Console → **IAM → Roles → Create role → AWS service → EC2**
 
 ## 5. EC2 instance
 Console → **EC2 → Launch instance**
-- Name `deepdive` · AMI **Amazon Linux 2023** (x86_64) · type **t3.small**
+- Name `deepdive` · AMI **Amazon Linux 2023** (x86_64) · type **t3.small** (on the free plan pick
+  a type labelled *Free tier eligible*)
 - Key pair: *Proceed without a key pair* (we use SSM, not SSH)
 - Network: create a security group `deepdive-web` allowing **HTTP 80** and **HTTPS 443** from
   anywhere. **No SSH (22).**
 - Storage: 20 GiB gp3
 - Advanced details → IAM instance profile: `deepdive-ec2`
-- Launch. Copy the **instance id** (`i-…`) and put it into the policy from step 3.
+- Launch. Copy the **instance id** (`i-…`) and add the SSM statements to the policy from step 2.
 
 ## 6. Elastic IP + first-time setup on the instance
 - **EC2 → Elastic IPs → Allocate**, then **Associate** with the `deepdive` instance.
@@ -114,12 +117,12 @@ GitHub → repo **Settings → Secrets and variables → Actions → Variables**
 | Name | Value |
 |---|---|
 | `AWS_REGION` | `ap-southeast-2` |
-| `AWS_ROLE_ARN` | `arn:aws:iam::<ACCOUNT_ID>:role/deepdive-github-deploy` |
 | `ECR_REPOSITORY` | `deepdive-research-agent` |
 | `EC2_INSTANCE_ID` | `i-…` |
 
-These are variables, not secrets: none of them grants access on its own. AWS keys never go into
-GitHub; the workflow gets short-lived credentials through OIDC.
+These are variables, not secrets: none of them grants access on its own. Leave `AWS_ROLE_ARN`
+unset on the free plan. (Setting `AWS_REGION` alone already lets a push build the image and push it
+to ECR, which is a handy check before the instance exists.)
 
 ## 8. Deploy and check
 Push to `main` (or Actions → deploy → Run workflow). Expected: `test`, `build-push`, `deploy` all
@@ -133,6 +136,23 @@ Open the site, enter the access code, run a question. Redeploy once more and che
 run is still listed (the SQLite/Chroma data lives in `/opt/deepdive/data`, outside the container).
 
 ## Costs and cleanup
-t3.small ≈ $0.02/h (~$15/month) plus a few cents of ECR storage. An Elastic IP is free while
-attached to a running instance. After results are announced: stop or terminate the instance and
-release the Elastic IP.
+On the free plan the eligible instance and ECR storage are covered by free-tier credits. An Elastic
+IP is free while attached to a running instance. After results are announced: terminate the
+instance, release the Elastic IP, **deactivate and delete the deploy user's access key** (IAM →
+Users → `deepdive-github-deploy` → Security credentials) and delete the two GitHub secrets.
+
+---
+
+## Appendix: OIDC role (paid plan)
+With IAM identity providers available, replace steps 2–3 with a role GitHub assumes per run, so no
+key is stored anywhere:
+
+1. **IAM → Identity providers → Add provider** → OpenID Connect · URL
+   `https://token.actions.githubusercontent.com` · audience `sts.amazonaws.com`.
+2. **IAM → Roles → Create role → Web identity** → that provider · organization `<GH_USER>` ·
+   repository `deepdive-research-agent` · branch `main` · name `deepdive-github-deploy`. Its trust
+   policy must restrict `token.actions.githubusercontent.com:sub` to
+   `repo:<GH_USER>/deepdive-research-agent:ref:refs/heads/main`.
+3. Attach the same inline policy as step 2 (ECR + SSM statements).
+4. Set the variable `AWS_ROLE_ARN` = `arn:aws:iam::<ACCOUNT_ID>:role/deepdive-github-deploy` and
+   delete the two access-key secrets.
