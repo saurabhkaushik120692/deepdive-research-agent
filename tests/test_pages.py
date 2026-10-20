@@ -129,7 +129,10 @@ def test_unknown_run_page_404(client):
     assert client.get("/runs/nope").status_code == 404
 
 
-def test_eval_page_without_results(client):
+def test_eval_page_without_results(client, tmp_path, monkeypatch):
+    import app.api.pages as pages
+
+    monkeypatch.setattr(pages, "EVAL_RESULTS", tmp_path)  # independent of committed results
     assert "No eval results yet" in client.get("/eval").text
 
 
