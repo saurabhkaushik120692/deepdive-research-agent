@@ -290,3 +290,37 @@ def test_limited_evidence_wording_is_accurate():
         "q", SynthesisOutput(title="T", summary="S", sections=[]), {}, {}, {}, ["X?"], []
     )
     assert "says nothing about them" not in md and "limited verified evidence" in md
+
+
+# --- live run 1: per-sub-question LLM stages must run concurrently ----------------------
+
+
+class _ConcurrencyProbe:
+    """Wraps a ScriptedLlm and records the max number of in-flight calls per role."""
+
+    def __init__(self, inner):
+        self.inner, self.in_flight, self.peak = inner, {}, {}
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    async def chat_json(self, *, role, **kw):
+        import asyncio
+
+        self.in_flight[role] = self.in_flight.get(role, 0) + 1
+        self.peak[role] = max(self.peak.get(role, 0), self.in_flight[role])
+        await asyncio.sleep(0.01)
+        try:
+            return await self.inner.chat_json(role=role, **kw)
+        finally:
+            self.in_flight[role] -= 1
+
+
+async def test_drafter_and_contradictions_run_subquestions_concurrently(deps):
+    script_happy_path(deps)
+    probe = _ConcurrencyProbe(deps.llm)
+    deps.llm = probe
+    run = create_run(deps.session_factory(), "q", deps.settings)
+    await run_research(run.id, deps)
+    assert get_run(deps, run.id).status == "completed"
+    assert probe.peak["drafter"] == 3 and probe.peak["contradictions"] == 3

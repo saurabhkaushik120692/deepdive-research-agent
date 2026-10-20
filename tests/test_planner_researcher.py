@@ -75,3 +75,17 @@ async def test_refine_updates_query_with_rejection_context(deps, run, sq):
     _, user = deps.llm.calls[-1]
     assert "Market is $5T." in user and "number not in source" in user
     assert "query_refined" in event_types(deps, run.id)
+
+
+async def test_research_cleans_links_and_caps_chunk_size(deps, run, sq):
+    page = " ".join(f"word{i} [link](https://example.com/{'x' * 60}/{i})" for i in range(800))
+    deps.search.results[sq.query] = [SearchResult("https://a.org/x", "A", page)]
+    await research_node({"run_id": run.id, "sub_question_id": sq.id, "round": 0}, cfg(deps))
+    from sqlmodel import select
+
+    from app.models import EvidenceChunk
+
+    with deps.session_factory() as s:
+        texts = s.exec(select(EvidenceChunk.text)).all()
+    assert texts and all(len(t) <= deps.settings.chunk_max_chars for t in texts)
+    assert not any("https://" in t for t in texts) and "word0 link" in texts[0]

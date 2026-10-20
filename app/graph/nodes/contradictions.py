@@ -1,3 +1,5 @@
+import asyncio
+
 from langchain_core.runnables import RunnableConfig
 from sqlmodel import select
 
@@ -8,6 +10,48 @@ from app.graph.state import ResearchState
 from app.llm import LlmOutputError
 from app.models import Claim, EvidenceChunk, Source, SubQuestion, Verdict
 from app.prompts import load_prompt
+
+
+async def _check_one(deps, run_id: str, sq, supported, domains) -> None:
+    claims = [c for c in supported if c.sub_question_id == sq.id]
+    if len(claims) < 2:
+        return
+    lines = [
+        f"[claim:{c.id}] (source: {', '.join(domains.get(i, '?') for i in c.chunk_ids)}) {c.text}"
+        for c in claims
+    ]
+    try:
+        out = await deps.llm.chat_json(
+            role="contradictions",
+            system=load_prompt("contradictions"),
+            user=f"Sub-question: {sq.text}\n\n" + "\n".join(lines),
+            schema=ContradictionOutput,
+            run_id=run_id,
+        )
+    except LlmOutputError as e:
+        # A bonus check must not sink the run: record it and move on.
+        with deps.session_factory() as session:
+            log_event(
+                session,
+                run_id,
+                "contradictions",
+                "contradiction_check_failed",
+                {"sub_question_id": sq.id, "error": str(e)},
+            )
+        return
+    allowed = {c.id for c in claims}
+    with deps.session_factory() as session:
+        for conflict in out.conflicts:
+            if {conflict.claim_a, conflict.claim_b} <= allowed and (
+                conflict.claim_a != conflict.claim_b
+            ):
+                log_event(
+                    session,
+                    run_id,
+                    "contradictions",
+                    "conflict_found",
+                    conflict.model_dump(),
+                )
 
 
 async def contradictions_node(state: ResearchState, config: RunnableConfig) -> dict:
@@ -34,45 +78,5 @@ async def contradictions_node(state: ResearchState, config: RunnableConfig) -> d
                 ).all()
             }
 
-        for sq in sqs:
-            claims = [c for c in supported if c.sub_question_id == sq.id]
-            if len(claims) < 2:
-                continue
-            lines = [
-                f"[claim:{c.id}] (source: {', '.join(domains.get(i, '?') for i in c.chunk_ids)}) "
-                f"{c.text}"
-                for c in claims
-            ]
-            try:
-                out = await deps.llm.chat_json(
-                    role="contradictions",
-                    system=load_prompt("contradictions"),
-                    user=f"Sub-question: {sq.text}\n\n" + "\n".join(lines),
-                    schema=ContradictionOutput,
-                    run_id=run_id,
-                )
-            except LlmOutputError as e:
-                # A bonus check must not sink the run: record it and move on.
-                with deps.session_factory() as session:
-                    log_event(
-                        session,
-                        run_id,
-                        "contradictions",
-                        "contradiction_check_failed",
-                        {"sub_question_id": sq.id, "error": str(e)},
-                    )
-                continue
-            allowed = {c.id for c in claims}
-            with deps.session_factory() as session:
-                for conflict in out.conflicts:
-                    if {conflict.claim_a, conflict.claim_b} <= allowed and (
-                        conflict.claim_a != conflict.claim_b
-                    ):
-                        log_event(
-                            session,
-                            run_id,
-                            "contradictions",
-                            "conflict_found",
-                            conflict.model_dump(),
-                        )
+        await asyncio.gather(*(_check_one(deps, run_id, sq, supported, domains) for sq in sqs))
     return {}

@@ -27,8 +27,8 @@ def _claims_prompt(question, sub_questions, verified, verdicts, chunk_sources) -
             tier = min(
                 (chunk_sources[ch].tier for ch in c.chunk_ids if ch in chunk_sources), default=3
             )
-            partial = " (partial)" if verdicts[c.id].label == "partial" else ""
-            parts.append(f"[claim:{c.id}] (tier {tier}){partial} {c.text}")
+            partial = ", only partly supported" if verdicts[c.id].label == "partial" else ""
+            parts.append(f"[claim:{c.id}] (source tier {tier}{partial}) {c.text}")
     return "\n".join(parts)
 
 

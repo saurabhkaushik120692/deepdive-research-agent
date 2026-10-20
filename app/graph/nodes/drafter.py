@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 from langchain_core.runnables import RunnableConfig
@@ -29,82 +30,86 @@ def _previous_block(previous: list[str]) -> str:
     return f"\n\nAlready drafted for this sub-question (do NOT repeat these):\n{lines}"
 
 
-async def draft_node(state: ResearchState, config: RunnableConfig) -> dict:
-    """Turn retrieved evidence into atomic claims, each citing the chunk(s) it came from."""
-    deps = get_deps(config)
+async def _draft_one(deps, state: ResearchState, sq_id: int) -> None:
     run_id, round_ = state["run_id"], state["round"]
-    with node_events(deps, run_id, "drafter", round=round_):
-        for sq_id in state["pending_sq_ids"]:
-            with deps.session_factory() as session:
-                sq_text = session.get(SubQuestion, sq_id).text
-                previous = session.exec(
-                    select(Claim.text).where(Claim.sub_question_id == sq_id).order_by(Claim.id)
-                ).all()
-            seen = {claim_key(t) for t in previous}
-            chunk_ids = await deps.vectors.query(run_id, sq_id, sq_text, deps.settings.top_k_chunks)
-            with deps.session_factory() as session:
-                rows = session.exec(
-                    select(EvidenceChunk, Source)
-                    .join(Source, Source.id == EvidenceChunk.source_id)
-                    .where(EvidenceChunk.id.in_(chunk_ids))
-                ).all()
-                if not rows:
-                    log_event(session, run_id, "drafter", "no_evidence", {"sub_question_id": sq_id})
-                    continue
-            rows = sorted(rows, key=lambda r: (r[1].tier, chunk_ids.index(r[0].id)))
-            given = {ch.id for ch, _ in rows}
+    with deps.session_factory() as session:
+        sq_text = session.get(SubQuestion, sq_id).text
+        previous = session.exec(
+            select(Claim.text).where(Claim.sub_question_id == sq_id).order_by(Claim.id)
+        ).all()
+    seen = {claim_key(t) for t in previous}
+    chunk_ids = await deps.vectors.query(run_id, sq_id, sq_text, deps.settings.top_k_chunks)
+    with deps.session_factory() as session:
+        rows = session.exec(
+            select(EvidenceChunk, Source)
+            .join(Source, Source.id == EvidenceChunk.source_id)
+            .where(EvidenceChunk.id.in_(chunk_ids))
+        ).all()
+        if not rows:
+            log_event(session, run_id, "drafter", "no_evidence", {"sub_question_id": sq_id})
+            return
+    rows = sorted(rows, key=lambda r: (r[1].tier, chunk_ids.index(r[0].id)))
+    given = {ch.id for ch, _ in rows}
 
-            draft = await deps.llm.chat_json(
-                role="drafter",
-                system=load_prompt("drafter"),
-                user=(
-                    f"Research question: {state['question']}\n"
-                    f"Sub-question (id {sq_id}): {sq_text}\n\n"
-                    f"Evidence:\n\n{_evidence_block(rows)}" + _previous_block(previous)
-                ),
-                schema=DraftOutput,
-                run_id=run_id,
-            )
+    draft = await deps.llm.chat_json(
+        role="drafter",
+        system=load_prompt("drafter"),
+        user=(
+            f"Research question: {state['question']}\n"
+            f"Sub-question (id {sq_id}): {sq_text}\n\n"
+            f"Evidence:\n\n{_evidence_block(rows)}" + _previous_block(previous)
+        ),
+        schema=DraftOutput,
+        run_id=run_id,
+    )
 
-            with deps.session_factory() as session:
-                kept = 0
-                for c in draft.claims:
-                    if not set(c.chunk_ids) <= given:
-                        log_event(
-                            session,
-                            run_id,
-                            "drafter",
-                            "claim_dropped_bad_citation",
-                            {"sub_question_id": sq_id, "text": c.text, "chunk_ids": c.chunk_ids},
-                        )
-                        continue
-                    if claim_key(c.text) in seen:
-                        # A re-research round must not re-count facts already drafted.
-                        log_event(
-                            session,
-                            run_id,
-                            "drafter",
-                            "claim_dropped_duplicate",
-                            {"sub_question_id": sq_id, "text": c.text},
-                        )
-                        continue
-                    seen.add(claim_key(c.text))
-                    session.add(
-                        Claim(
-                            run_id=run_id,
-                            sub_question_id=sq_id,
-                            text=c.text,
-                            chunk_ids=c.chunk_ids,
-                            round=round_,
-                        )
-                    )
-                    kept += 1
-                session.commit()
+    with deps.session_factory() as session:
+        kept = 0
+        for c in draft.claims:
+            if not set(c.chunk_ids) <= given:
                 log_event(
                     session,
                     run_id,
                     "drafter",
-                    "claims_drafted",
-                    {"sub_question_id": sq_id, "n_claims": kept},
+                    "claim_dropped_bad_citation",
+                    {"sub_question_id": sq_id, "text": c.text, "chunk_ids": c.chunk_ids},
                 )
+                continue
+            if claim_key(c.text) in seen:
+                # A re-research round must not re-count facts already drafted.
+                log_event(
+                    session,
+                    run_id,
+                    "drafter",
+                    "claim_dropped_duplicate",
+                    {"sub_question_id": sq_id, "text": c.text},
+                )
+                continue
+            seen.add(claim_key(c.text))
+            session.add(
+                Claim(
+                    run_id=run_id,
+                    sub_question_id=sq_id,
+                    text=c.text,
+                    chunk_ids=c.chunk_ids,
+                    round=round_,
+                )
+            )
+            kept += 1
+        session.commit()
+        log_event(
+            session,
+            run_id,
+            "drafter",
+            "claims_drafted",
+            {"sub_question_id": sq_id, "n_claims": kept},
+        )
+
+
+async def draft_node(state: ResearchState, config: RunnableConfig) -> dict:
+    """Turn retrieved evidence into atomic claims, each citing the chunk(s) it came from.
+    Sub-questions are drafted concurrently (each call is an independent LLM request)."""
+    deps = get_deps(config)
+    with node_events(deps, state["run_id"], "drafter", round=state["round"]):
+        await asyncio.gather(*(_draft_one(deps, state, sq) for sq in state["pending_sq_ids"]))
     return {}

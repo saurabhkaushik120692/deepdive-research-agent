@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     search_results_per_query: int = 5
     chunk_words: int = 600
     chunk_overlap_words: int = 75
+    chunk_max_chars: int = 3000  # embedding model input limit is 2048 tokens
     max_chunks_per_source: int = 40
     top_k_chunks: int = 6
 

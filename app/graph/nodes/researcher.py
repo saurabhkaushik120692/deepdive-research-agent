@@ -8,7 +8,7 @@ from app.deps import Deps, SearchResult
 from app.events import log_event
 from app.graph.nodes import get_deps, node_events
 from app.models import EvidenceChunk, SearchRecord, Source, SubQuestion
-from app.tools.chunking import chunk_text
+from app.tools.chunking import chunk_text, clean_text
 from app.tools.fetch import MIN_TEXT_CHARS
 from app.tools.tiers import source_tier
 
@@ -47,7 +47,8 @@ async def research_node(payload: dict, config: RunnableConfig) -> dict:
         new_ids: list[int] = []
         new_texts: list[str] = []
         with deps.session_factory() as session:
-            for result, text in zip(fresh, texts, strict=True):
+            for result, raw in zip(fresh, texts, strict=True):
+                text = clean_text(raw) if raw else ""
                 if not text:
                     log_event(
                         session,
@@ -67,7 +68,12 @@ async def research_node(payload: dict, config: RunnableConfig) -> dict:
                 session.add(source)
                 session.commit()
                 session.refresh(source)
-                pieces = chunk_text(text, settings.chunk_words, settings.chunk_overlap_words)
+                pieces = chunk_text(
+                    text,
+                    settings.chunk_words,
+                    settings.chunk_overlap_words,
+                    settings.chunk_max_chars,
+                )
                 rows = [
                     EvidenceChunk(
                         source_id=source.id,
