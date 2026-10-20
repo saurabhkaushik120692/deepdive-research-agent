@@ -79,6 +79,22 @@ async def research_questions(deps: Deps, questions: list[dict], concurrency: int
     return run_ids
 
 
+async def retry_failed(deps: Deps, stored: list[dict], questions: list[dict]) -> list[dict]:
+    """Re-research only the questions whose stored run did not complete; keep the rest."""
+    text = {q["id"]: q["question"] for q in questions}
+    with deps.session_factory() as session:
+        failed = [
+            i for i, s in enumerate(stored) if session.get(Run, s["run_id"]).status != "completed"
+        ]
+    new_ids = await research_questions(
+        deps, [{"question": text[stored[i]["question_id"]]} for i in failed]
+    )
+    out = [dict(s) for s in stored]
+    for i, run_id in zip(failed, new_ids, strict=True):
+        out[i]["run_id"] = run_id
+    return out
+
+
 def _seconds(start: datetime, end: datetime | None) -> float | None:
     if end is None:
         return None
@@ -385,12 +401,18 @@ async def _main(args) -> int:
 
     deps.llm.on_usage = on_usage
     runs_file = Path(args.runs_file)
+    questions = [
+        json.loads(line) for line in QUESTIONS.read_text(encoding="utf-8").splitlines() if line
+    ][: args.limit]
     if args.skip_research:
         stored = json.loads(runs_file.read_text(encoding="utf-8"))
+    elif args.retry_failed:
+        print("re-researching failed questions...")
+        stored = await retry_failed(
+            deps, json.loads(runs_file.read_text(encoding="utf-8")), questions
+        )
+        runs_file.write_text(json.dumps(stored, indent=2), encoding="utf-8")
     else:
-        questions = [
-            json.loads(line) for line in QUESTIONS.read_text(encoding="utf-8").splitlines() if line
-        ][: args.limit]
         print(f"researching {len(questions)} questions...")
         ids = await research_questions(deps, questions)
         stored = [
@@ -423,6 +445,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--skip-research", action="store_true")
+    parser.add_argument("--retry-failed", action="store_true", help="re-run only failed questions")
     parser.add_argument("--runs-file", default=str(RESULTS_DIR / "runs.json"))
     parser.add_argument("--seed", type=int, default=7)
     return asyncio.run(_main(parser.parse_args()))

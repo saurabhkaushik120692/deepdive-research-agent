@@ -35,11 +35,13 @@ class Settings(BaseSettings):
     search_results_per_query: int = 5
     chunk_words: int = 600
     chunk_overlap_words: int = 75
-    chunk_max_chars: int = 3000  # embedding model input limit is 2048 tokens
+    chunk_max_chars: int = 3000
+    embed_max_chars: int = 1000  # embedding input limit is 2048 tokens; dense text ~1 char/token
     max_chunks_per_source: int = 40
     top_k_chunks: int = 6
 
-    llm_max_retries: int = 3
+    llm_max_retries: int = 5
+    llm_rpm: int = 80  # Mesh allows 100 requests/minute per account; keep headroom
     llm_concurrency: int = 8
     llm_timeout_s: float = 180.0  # reasoning models (gpt-5-nano) often need 60-120 s per call
 

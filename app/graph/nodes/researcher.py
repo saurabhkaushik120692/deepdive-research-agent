@@ -8,7 +8,7 @@ from app.deps import Deps, SearchResult
 from app.events import log_event
 from app.graph.nodes import get_deps, node_events
 from app.models import EvidenceChunk, SearchRecord, Source, SubQuestion
-from app.tools.chunking import chunk_text, clean_text
+from app.tools.chunking import chunk_text, clean_text, is_noise
 from app.tools.fetch import MIN_TEXT_CHARS
 from app.tools.tiers import source_tier
 
@@ -49,13 +49,24 @@ async def research_node(payload: dict, config: RunnableConfig) -> dict:
         with deps.session_factory() as session:
             for result, raw in zip(fresh, texts, strict=True):
                 text = clean_text(raw) if raw else ""
-                if not text:
+                pieces = [
+                    p
+                    for p in chunk_text(
+                        text,
+                        settings.chunk_words,
+                        settings.chunk_overlap_words,
+                        settings.chunk_max_chars,
+                    )
+                    if not is_noise(p)
+                ]
+                if not pieces:
+                    reason = "no usable text" if not text else "only tables/markup, no prose"
                     log_event(
                         session,
                         run_id,
                         "researcher",
                         "source_skipped",
-                        {"sub_question_id": sq_id, "url": result.url, "reason": "no usable text"},
+                        {"sub_question_id": sq_id, "url": result.url, "reason": reason},
                     )
                     continue
                 source = Source(
@@ -68,12 +79,6 @@ async def research_node(payload: dict, config: RunnableConfig) -> dict:
                 session.add(source)
                 session.commit()
                 session.refresh(source)
-                pieces = chunk_text(
-                    text,
-                    settings.chunk_words,
-                    settings.chunk_overlap_words,
-                    settings.chunk_max_chars,
-                )
                 rows = [
                     EvidenceChunk(
                         source_id=source.id,

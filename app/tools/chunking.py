@@ -41,3 +41,12 @@ def chunk_text(
         if end >= len(words):
             return chunks
         start = max(start + 1, end - overlap_words)
+
+
+def is_noise(text: str, min_letter_share: float = 0.5) -> bool:
+    """Chunks that are mostly digits/symbols (number tables, leader dots, SVG/markup) carry no
+    quotable evidence, cost tokens, and can exceed the embedding model's input limit."""
+    visible = [c for c in text if not c.isspace()]
+    if not visible:
+        return True
+    return sum(c.isalpha() for c in visible) / len(visible) < min_letter_share
