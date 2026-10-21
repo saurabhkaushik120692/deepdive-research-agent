@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from eval.annotate import annotate, load_rows, save_rows
 
@@ -109,3 +110,47 @@ def test_claim_numbers_are_marked_in_source():
     screen = shown[0]
     assert "In >>2023<< Japan" in screen and ">>46.1<< thousand total" in screen
     assert "146.1" in screen and ">>146.1" not in screen and "1>>46.1" not in screen
+
+
+# --- readability --------------------------------------------------------------------------
+
+ROBOTS = json.loads(
+    (Path(__file__).parent / "data" / "robots_claim.json").read_text(encoding="utf-8")
+)
+
+
+def test_excerpt_centres_on_the_claim_evidence():
+    from eval.annotate import excerpt
+
+    text, start, end = excerpt(ROBOTS["claim"], ROBOTS["source_text"], size=700)
+    assert "Japan | 46.1" in text and len(text) <= 760
+    assert 0 < start < end <= len(ROBOTS["source_text"])
+
+
+def test_tables_and_headings_get_their_own_lines():
+    from eval.annotate import layout
+
+    out = layout(
+        "# Largest markets #### Top | Country | N | | --- | --- | "
+        "| China | 276.3 | | Japan | 46.1 |"
+    )
+    lines = out.splitlines()
+    assert "| China | 276.3 |" in lines and "| Japan | 46.1 |" in lines
+    assert any(line.startswith("#### Top") for line in lines)
+
+
+def test_screen_shows_excerpt_and_full_on_request():
+    rows = [{**ROBOTS, "claim_id": 1, "verifier_label": "supported", "gold_supported": None}]
+    shown, _ = _run(rows, ["f", "y"])
+    first, full = shown[0], shown[1]
+    assert "press f" in first.lower() and "electronics sector" not in first
+    assert "electronics sector" in full and rows[0]["gold_supported"] is True
+
+
+def test_colour_highlights_numbers_and_keywords():
+    from eval.annotate import highlight
+
+    out = highlight("Japan had 46.1 thousand installations", "| Japan | 46.1 | China", color=True)
+    assert "\x1b[" in out and "46.1" in out and "Japan" in out
+    plain = highlight("Japan had 46.1 thousand", "| Japan | 46.1 |", color=False)
+    assert ">>46.1<<" in plain and "\x1b[" not in plain

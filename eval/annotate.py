@@ -7,15 +7,17 @@ you can quit and resume any time.
 """
 
 import json
+import os
 import random
 import re
+import sys
 import textwrap
 from collections.abc import Callable
 from pathlib import Path
 
 from eval.label import GOLD_PATH
 
-PROMPT = "Does the source support the claim?  [y]es  [n]o  [s]kip  [b]ack  [q]uit > "
+PROMPT = "Does the source support the claim?  [y]es  [n]o  [f]ull text  [s]kip  [b]ack  [q]uit > "
 HELP = (
     "Answer 'y' only if the source text states the claim (same numbers, dates, names). "
     "Answer 'n' if it says something different, more, or nothing about it."
@@ -31,20 +33,94 @@ def save_rows(path: Path, rows: list[dict]) -> None:
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), "utf-8")
 
 
-def mark_numbers(claim: str, source: str) -> str:
-    """Mark the claim's numbers where they occur in the source (>>2023<<) so they're easy to
-    find. Derived from the claim only, so it doesn't hint at the verifier's answer."""
-    for n in sorted(set(re.findall(r"\d+(?:[.,]\d+)*", claim)), key=len, reverse=True):
-        source = re.sub(rf"(?<![\d.,]){re.escape(n)}(?![\d]|[.,]\d)", f">>{n}<<", source)
-    return source
+_NUM = r"\d+(?:[.,]\d+)*"
+_STOP = {
+    "that", "this", "with", "from", "were", "have", "been", "their", "which", "about", "more",
+    "than", "into", "over", "also", "will", "would", "could", "there", "they", "some", "such",
+}  # fmt: skip
+YELLOW, CYAN, RESET = "\x1b[1;33m", "\x1b[36m", "\x1b[0m"
 
 
-def _screen(row: dict, position: int, total: int, done: int) -> str:
-    source = textwrap.fill(mark_numbers(row["claim"], row["source_text"]), width=100)
+def _numbers(claim: str) -> list[str]:
+    return sorted(set(re.findall(_NUM, claim)), key=len, reverse=True)
+
+
+def _keywords(claim: str) -> list[str]:
+    words = {w.lower() for w in re.findall(r"[A-Za-z][A-Za-z-]{3,}", claim)}
+    return sorted(words - _STOP, key=len, reverse=True)
+
+
+def _num_pattern(n: str) -> str:
+    return rf"(?<![\d.,]){re.escape(n)}(?![\d]|[.,]\d)"
+
+
+def excerpt(claim: str, text: str, size: int = 700) -> tuple[str, int, int]:
+    """The most relevant window of the source: where the claim's numbers (weighted by rarity)
+    and key words occur. Returns (snippet, start, end)."""
+    if len(text) <= size:
+        return text, 0, len(text)
+    hits: list[tuple[int, float]] = []
+    for n in _numbers(claim):
+        found = [m.start() for m in re.finditer(_num_pattern(n), text)]
+        hits += [(pos, 3 / len(found)) for pos in found]
+    for w in _keywords(claim):
+        found = [m.start() for m in re.finditer(rf"\b{re.escape(w)}", text, re.IGNORECASE)]
+        hits += [(pos, 1 / len(found)) for pos in found]
+    best_start, best_score = 0, -1.0
+    for start in range(0, len(text) - size + 50, 50):
+        score = sum(w for pos, w in hits if start <= pos < start + size)
+        if score > best_score:
+            best_start, best_score = start, score
+    start = text.rfind(" ", 0, best_start) + 1 if best_start else 0
+    end = text.find(" ", min(len(text), best_start + size))
+    end = len(text) if end == -1 else end
+    return text[start:end], start, end
+
+
+def layout(text: str) -> str:
+    """Put markdown table rows and headings on their own lines; wrap the prose."""
+    text = re.sub(r"\|\s+\|", "|\n|", text)
+    text = re.sub(r"\s*(?:>\s*)?(#{1,6} )", r"\n\1", text)
+    lines = []
+    for line in text.strip().splitlines():
+        line = line.strip()
+        lines.append(line if line.startswith("|") else textwrap.fill(line, width=100))
+    return "\n".join(lines)
+
+
+def highlight(claim: str, text: str, color: bool) -> str:
+    """Mark the claim's numbers (and, in colour, its key words) where they occur in the source.
+    Derived from the claim only, so it doesn't hint at the verifier's answer."""
+    for n in _numbers(claim):
+        mark = f"{YELLOW}{n}{RESET}" if color else f">>{n}<<"
+        text = re.sub(_num_pattern(n), mark, text)
+    if color:
+        for w in _keywords(claim):
+            text = re.sub(rf"\b({re.escape(w)})", rf"{CYAN}\1{RESET}", text, flags=re.IGNORECASE)
+    return text
+
+
+def _screen(
+    row: dict, position: int, total: int, done: int, full: bool = False, color: bool = False
+) -> str:
+    source = row["source_text"]
+    if full:
+        body, note = source, "(full source text)"
+    else:
+        body, start, end = excerpt(row["claim"], source)
+        note = (
+            "(whole source shown)"
+            if (start, end) == (0, len(source))
+            else f"(most relevant part, characters {start}-{end} of {len(source)}; "
+            "press f for the full source)"
+        )
     rule = "-" * 100
+    clear = "\x1b[2J\x1b[H" if color else ""
+    claim = highlight(row["claim"], row["claim"], color) if color else row["claim"]
     return (
-        f"\n{rule}\nClaim {position} of {total}   ({done} labelled so far)\n{rule}\n"
-        f"CLAIM: {row['claim']}\n\nSOURCE TEXT:\n{source}\n{rule}\n{HELP}"
+        f"{clear}\n{rule}\nClaim {position} of {total}   ({done} labelled so far)\n{rule}\n"
+        f"CLAIM: {claim}\n\nSOURCE {note}:\n\n{highlight(row['claim'], layout(body), color)}"
+        f"\n{rule}\n{HELP}"
     )
 
 
@@ -54,16 +130,21 @@ def annotate(
     show: Callable[[str], None],
     save: Callable[[], None],
     seed: int = 11,
+    color: bool = False,
 ) -> None:
     queue = [i for i, r in enumerate(rows) if r.get("gold_supported") is None]
     random.Random(seed).shuffle(queue)
     history: list[int] = []
-    pos = 0
+    pos, full = 0, False
     while pos < len(queue):
         i = queue[pos]
         done = sum(r.get("gold_supported") is not None for r in rows)
-        show(_screen(rows[i], pos + 1, len(queue), done))
+        show(_screen(rows[i], pos + 1, len(queue), done, full=full, color=color))
         answer = ask(PROMPT).strip().lower()
+        if answer == "f":
+            full = True
+            continue
+        full = False
         if answer in ("y", "n"):
             rows[i]["gold_supported"] = answer == "y"
             history.append(pos)
@@ -86,7 +167,10 @@ def main() -> int:
         print(f"{path} not found. Build it first: uv run python -m eval.label --n 50")
         return 1
     rows = load_rows(path)
-    annotate(rows, ask=input, show=print, save=lambda: save_rows(path, rows))
+    color = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+    if color and os.name == "nt":
+        os.system("")  # turn on ANSI colours in the Windows console
+    annotate(rows, ask=input, show=print, save=lambda: save_rows(path, rows), color=color)
     labelled = sum(r.get("gold_supported") is not None for r in rows)
     print(f"\n{labelled}/{len(rows)} claims labelled, saved to {path}.")
     if labelled == len(rows):
