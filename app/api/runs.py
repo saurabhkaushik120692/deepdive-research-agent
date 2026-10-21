@@ -35,9 +35,12 @@ def _get_run_or_404(session, run_id: str) -> Run:
 
 async def _passes_safety_screen(deps: Deps, question: str) -> bool:
     try:
-        return not await deps.llm.moderate(question)
+        flagged = await asyncio.wait_for(
+            deps.llm.moderate(question), timeout=deps.settings.moderation_timeout_s
+        )
+        return not flagged
     except Exception:
-        # Moderation is a courtesy screen; if the endpoint is down, don't block research.
+        # Moderation is a courtesy screen; if it's down or queued behind busy runs, don't block.
         return True
 
 

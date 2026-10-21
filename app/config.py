@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Every LLM / embedding / moderation call must go through Mesh (hackathon rule).
@@ -41,12 +41,14 @@ class Settings(BaseSettings):
     top_k_chunks: int = 6
 
     llm_max_retries: int = 5
-    llm_rpm: int = 80  # Mesh allows 100 requests/minute per account; keep headroom
+    llm_timeout_retries: int = 1  # a timed-out call already took llm_timeout_s
+    llm_rpm: int = Field(default=80, gt=0)  # Mesh allows 100 requests/minute per account
     llm_concurrency: int = 8
     llm_timeout_s: float = 180.0  # reasoning models (gpt-5-nano) often need 60-120 s per call
 
     demo_access_code: str = ""  # empty = no access gate
     runs_per_hour: int = 10
+    moderation_timeout_s: float = 10.0  # the safety screen must never stall run creation
     max_concurrent_runs: int = 2
 
     @model_validator(mode="after")

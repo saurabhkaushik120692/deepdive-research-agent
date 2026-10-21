@@ -121,7 +121,7 @@ async def test_verifier_probe_counts_api_errors_instead_of_crashing(deps):
     await run_research(run.id, deps)
 
     def broken_verifier(system, user):
-        raise RuntimeError("upstream 400")
+        raise openai.APIConnectionError(request=httpx.Request("POST", "https://api.meshapi.ai/v1"))
 
     deps.llm.handlers["verifier"] = broken_verifier
     probe = await verifier_probe(deps, [run.id], random.Random(1), kinds=("number",))

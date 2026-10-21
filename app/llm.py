@@ -117,11 +117,18 @@ class MeshLlm:
         attempt = 0
         while True:
             try:
-                await self._limiter.acquire()
                 async with self._slots:
+                    # Take window budget only once a slot is held, i.e. when the request is sent.
+                    await self._limiter.acquire()
                     return await fn(**kwargs)
             except _TRANSIENT as e:
-                if attempt >= self.settings.llm_max_retries:
+                # A hung call already cost up to llm_timeout_s; don't repeat that many times.
+                limit = (
+                    self.settings.llm_timeout_retries
+                    if isinstance(e, openai.APITimeoutError)
+                    else self.settings.llm_max_retries
+                )
+                if attempt >= limit:
                     raise
                 delay = self.retry_base_delay * 2**attempt
                 if isinstance(e, openai.RateLimitError):

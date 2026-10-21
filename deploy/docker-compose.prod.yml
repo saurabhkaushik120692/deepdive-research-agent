@@ -21,7 +21,7 @@ services:
     environment:
       # Only the hostname: Caddy never needs the app's API keys. Compose reads SITE_HOST from
       # /opt/deepdive/.env for this substitution without passing the rest of the file.
-      SITE_HOST: ${SITE_HOST}
+      SITE_HOST: ${SITE_HOST:?set SITE_HOST in /opt/deepdive/.env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

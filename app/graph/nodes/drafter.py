@@ -8,6 +8,7 @@ from app.events import log_event
 from app.graph.nodes import get_deps, node_events
 from app.graph.schemas import DraftOutput
 from app.graph.state import ResearchState
+from app.llm import LlmOutputError
 from app.models import Claim, EvidenceChunk, Source, SubQuestion
 from app.prompts import load_prompt
 
@@ -51,17 +52,30 @@ async def _draft_one(deps, state: ResearchState, sq_id: int) -> None:
     rows = sorted(rows, key=lambda r: (r[1].tier, chunk_ids.index(r[0].id)))
     given = {ch.id for ch, _ in rows}
 
-    draft = await deps.llm.chat_json(
-        role="drafter",
-        system=load_prompt("drafter"),
-        user=(
-            f"Research question: {state['question']}\n"
-            f"Sub-question (id {sq_id}): {sq_text}\n\n"
-            f"Evidence:\n\n{_evidence_block(rows)}" + _previous_block(previous)
-        ),
-        schema=DraftOutput,
-        run_id=run_id,
-    )
+    try:
+        draft = await deps.llm.chat_json(
+            role="drafter",
+            system=load_prompt("drafter"),
+            user=(
+                f"Research question: {state['question']}\n"
+                f"Sub-question (id {sq_id}): {sq_text}\n\n"
+                f"Evidence:\n\n{_evidence_block(rows)}" + _previous_block(previous)
+            ),
+            schema=DraftOutput,
+            run_id=run_id,
+        )
+    except LlmOutputError as e:
+        # One unparseable draft leaves this sub-question thin (the loop rule handles it);
+        # it must not fail the whole run.
+        with deps.session_factory() as session:
+            log_event(
+                session,
+                run_id,
+                "drafter",
+                "draft_failed",
+                {"sub_question_id": sq_id, "error": str(e)},
+            )
+        return
 
     with deps.session_factory() as session:
         kept = 0
@@ -111,5 +125,9 @@ async def draft_node(state: ResearchState, config: RunnableConfig) -> dict:
     Sub-questions are drafted concurrently (each call is an independent LLM request)."""
     deps = get_deps(config)
     with node_events(deps, state["run_id"], "drafter", round=state["round"]):
-        await asyncio.gather(*(_draft_one(deps, state, sq) for sq in state["pending_sq_ids"]))
+        # TaskGroup (not gather): if one sub-question fails hard, the others are cancelled
+        # instead of spending budget and writing into a run that is already failed.
+        async with asyncio.TaskGroup() as tg:
+            for sq in state["pending_sq_ids"]:
+                tg.create_task(_draft_one(deps, state, sq))
     return {}

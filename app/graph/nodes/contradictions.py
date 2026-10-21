@@ -1,5 +1,6 @@
 import asyncio
 
+import openai
 from langchain_core.runnables import RunnableConfig
 from sqlmodel import select
 
@@ -28,7 +29,7 @@ async def _check_one(deps, run_id: str, sq, supported, domains) -> None:
             schema=ContradictionOutput,
             run_id=run_id,
         )
-    except LlmOutputError as e:
+    except (LlmOutputError, openai.APIError) as e:
         # A bonus check must not sink the run: record it and move on.
         with deps.session_factory() as session:
             log_event(
@@ -78,5 +79,7 @@ async def contradictions_node(state: ResearchState, config: RunnableConfig) -> d
                 ).all()
             }
 
-        await asyncio.gather(*(_check_one(deps, run_id, sq, supported, domains) for sq in sqs))
+        async with asyncio.TaskGroup() as tg:
+            for sq in sqs:
+                tg.create_task(_check_one(deps, run_id, sq, supported, domains))
     return {}

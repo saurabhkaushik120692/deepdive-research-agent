@@ -40,7 +40,8 @@ def chunk_text(
         chunks.append(" ".join(words[start:end]))
         if end >= len(words):
             return chunks
-        start = max(start + 1, end - overlap_words)
+        overlap = min(overlap_words, (end - start) // 4)  # char-capped windows can be short
+        start = max(start + 1, end - overlap)
 
 
 def is_noise(text: str, min_letter_share: float = 0.5) -> bool:

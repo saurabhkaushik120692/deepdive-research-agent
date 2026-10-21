@@ -91,13 +91,23 @@ def layout(text: str) -> str:
 def highlight(claim: str, text: str, color: bool) -> str:
     """Mark the claim's numbers (and, in colour, its key words) where they occur in the source.
     Derived from the claim only, so it doesn't hint at the verifier's answer."""
-    for n in _numbers(claim):
-        mark = f"{YELLOW}{n}{RESET}" if color else f">>{n}<<"
-        text = re.sub(_num_pattern(n), mark, text)
-    if color:
-        for w in _keywords(claim):
-            text = re.sub(rf"\b({re.escape(w)})", rf"{CYAN}\1{RESET}", text, flags=re.IGNORECASE)
-    return text
+    # One pass over the original text, so a mark can never match inside an earlier mark's codes.
+    parts = (
+        [f"(?P<num>{'|'.join(_num_pattern(n) for n in _numbers(claim))})"]
+        if _numbers(claim)
+        else []
+    )
+    if color and _keywords(claim):
+        parts.append(f"(?P<word>\\b(?:{'|'.join(re.escape(w) for w in _keywords(claim))}))")
+    if not parts:
+        return text
+
+    def mark(m: re.Match) -> str:
+        if m.group("num") is not None:
+            return f"{YELLOW}{m.group(0)}{RESET}" if color else f">>{m.group(0)}<<"
+        return f"{CYAN}{m.group(0)}{RESET}"
+
+    return re.sub("|".join(parts), mark, text, flags=re.IGNORECASE)
 
 
 def _screen(

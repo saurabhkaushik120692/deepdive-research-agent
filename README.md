@@ -8,6 +8,19 @@ every step of the run is recorded.
 Research tools that cite sources already exist. Their known weakness is trust: the cited page
 often doesn't say what the sentence claims. DeepDive's focus is making the citations true.
 
+**Measured on 24 research questions** ([full results](eval/RESULTS.md)):
+
+| | |
+|---|---|
+| Planted false claims caught by the verifier | **87.0%** of 54 |
+| True claims wrongly rejected | **0.0%** of 60 |
+| Report claims judged grounded by an independent model | **94.0%** of 100 |
+| Agreement with 50 hand-labelled claims | **86.0%** (Cohen's κ 0.70) |
+| Verifier quotes found verbatim in the source | **99.5%** |
+| Cost / time per research run | **$0.04** / ~4 min |
+
+**Live demo:** https://16.178.82.245.nip.io (access code in the submission notes).
+
 ## How the agents cooperate
 
 ```mermaid
@@ -69,7 +82,35 @@ and measures:
   Cohen's kappa).
 - Quote validity, loop rate, sub-question coverage, cost and latency per run.
 
-**Results: [`eval/RESULTS.md`](eval/RESULTS.md)** (also shown on the app's `/eval` page).
+### Results (24 questions, 1,433 drafted claims; [`eval/RESULTS.md`](eval/RESULTS.md), also on the app's `/eval` page)
+
+| Metric | Result |
+|---|---|
+| Runs completed | 24 / 24 |
+| Verifier catch rate, all planted errors | 87.0% of 54 |
+| · changed number | 100.0% of 7 |
+| · flipped direction / negation | 94.7% of 19 |
+| · swapped entity | 78.9% of 19 |
+| · shifted year | 77.8% of 9 |
+| Wrongful rejection rate | 0.0% of 60 |
+| Independent groundedness (Gemini judge) | 94.0% of 100 |
+| Agreement with hand labels | 86.0% of 50 · κ 0.70 |
+| Drafted claims rejected by the verifier | 7.5% (108 of 1,433) |
+| Runs that looped back to research | 20.8% |
+| Sub-questions ending with enough verified support | 100% of 115 |
+| Cost per run (mean / p95) | $0.039 / $0.056 |
+| Time per run (p50 / p95) | 242 s / 383 s |
+
+**What the numbers say, honestly:**
+- The verifier is strongest where errors are concrete: changed numbers and flipped directions.
+  Swapped entities and shifted years get through about 1 time in 5. The clearest next improvement
+  is a deterministic entity/year consistency check in code, like the existing number check.
+- Against the hand labels, 6 of the 7 disagreements are the verifier being *more lenient* than a
+  human, mostly on claims it marked "partial". Partial claims are shown with a warning marker in
+  reports for this reason.
+- The eval caught real problems before judges did. Mesh's 100 requests/minute limit, embedding
+  inputs over 2048 tokens, and an empty-reply edge case all failed runs in the first full eval and
+  are fixed (see [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md#what-live-runs-taught-us)).
 
 ## Run it
 

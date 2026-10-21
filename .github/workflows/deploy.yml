@@ -1,16 +1,17 @@
 name: deploy
 
 # Push to main → tests → build image → push to ECR → EC2 pulls and restarts (via SSM, no SSH).
-# AWS auth: GitHub OIDC role if vars.AWS_ROLE_ARN is set (paid plan), otherwise the scoped
-# deploy user's access keys from secrets (AWS free plan has no IAM identity providers).
+# AWS auth: the scoped deploy user's access keys from secrets (AWS free plan has no IAM identity
+# providers), or a GitHub OIDC role on a paid plan: set vars.AWS_ROLE_ARN AND delete the key
+# secrets (with both present the action would try to chain from the keys into the role).
 # build-push runs once vars.AWS_REGION exists; deploy once vars.EC2_INSTANCE_ID exists too.
+# Logs are public once the repo is: the AWS account id stays masked and no app logs are printed.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  id-token: write   # only used when the OIDC role is configured
   contents: read
 
 concurrency:
@@ -38,8 +39,9 @@ jobs:
     needs: test
     if: ${{ vars.AWS_REGION != '' }}
     runs-on: ubuntu-latest
-    outputs:
-      registry: ${{ steps.ecr.outputs.registry }}
+    permissions:
+      id-token: write   # only used when the OIDC role is configured
+      contents: read
     steps:
       - uses: actions/checkout@v5
       - uses: aws-actions/configure-aws-credentials@v4
@@ -48,7 +50,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
-          mask-aws-account-id: false   # the registry URL is passed between jobs
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
       - name: Build and push image
@@ -63,6 +64,9 @@ jobs:
     needs: build-push
     if: ${{ vars.EC2_INSTANCE_ID != '' }}
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # only used when the OIDC role is configured
+      contents: read
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -70,10 +74,11 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
-          mask-aws-account-id: false   # the registry URL is passed between jobs
+      - id: ecr   # resolves the registry URL here instead of passing it (masked) between jobs
+        uses: aws-actions/amazon-ecr-login@v2
       - name: Pull and restart on EC2 via SSM
         env:
-          REGISTRY: ${{ needs.build-push.outputs.registry }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
           TAG: ${{ github.sha }}
         run: |
@@ -86,7 +91,7 @@ jobs:
             "docker compose -f docker-compose.prod.yml pull",
             "docker compose -f docker-compose.prod.yml up -d --remove-orphans",
             "docker image prune -f",
-            "for i in \$(seq 1 24); do docker compose -f docker-compose.prod.yml ps app | grep -q '(healthy)' && exit 0; sleep 5; done; docker compose -f docker-compose.prod.yml logs --tail 50 app; exit 1"
+            "for i in \$(seq 1 24); do docker compose -f docker-compose.prod.yml ps app | grep -q '(healthy)' && exit 0; sleep 5; done; docker compose -f docker-compose.prod.yml ps; echo 'app not healthy: check logs on the instance (docker compose logs app)'; exit 1"
           ]}
           JSON
           CMD_ID=$(aws ssm send-command \

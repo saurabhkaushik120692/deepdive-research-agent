@@ -20,6 +20,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
+import openai
 from sqlmodel import select
 
 from app.config import get_settings
@@ -178,7 +179,7 @@ async def _mutant(row, kinds: tuple[MutationKind, ...], start: int, deps, rng):
         if kind == "entity":
             try:
                 text = await entity_swap(row.claim.text, deps.llm)
-            except LlmOutputError:
+            except (LlmOutputError, openai.APIError):
                 text = None
         else:
             text = mutate_claim(row.claim.text, kind, rng)
@@ -191,7 +192,7 @@ async def _safe_verify(deps: Deps, text: str, source: str):
     """Verify one claim for the probe; an API error is counted, not fatal to the whole eval."""
     try:
         return await verify_claim(deps, None, text, source)
-    except Exception:
+    except (LlmOutputError, openai.APIError):  # API failures only; bugs must surface
         return None
 
 
@@ -257,7 +258,7 @@ async def judge_reports(deps: Deps, run_ids: list[str], rng: random.Random, max_
 async def _judge_or_none(deps: Deps, row):
     try:
         return await judge_claim(deps.llm, row.claim.text, row.source_text)
-    except LlmOutputError:
+    except (LlmOutputError, openai.APIError):
         return None
 
 
@@ -364,6 +365,13 @@ def render_results_md(r: dict) -> str:
     table = "\n".join(f"| {k} | {v} |" for k, v in rows)
     models = "\n".join(f"- {role}: `{m}`" for role, m in r["models"].items())
     failed = ", ".join(r["runs"]["failed_ids"]) or "none"
+    gold_note = (
+        f"the owner labelled {g['n_labelled']} claims by reading the source text, without seeing "
+        "the verifier's answer (`eval/annotate.py`); partial verdicts count as supported."
+        if g["n_labelled"]
+        else "the owner labels claims by reading the source text; n/a until "
+        "`eval/gold/claims_gold.jsonl` is filled in."
+    )
     return f"""# DeepDive self-evaluation results
 
 Generated {r["generated_at"]} on {r["n_questions"]} questions from `eval/questions.jsonl`.
@@ -381,8 +389,7 @@ Generated {r["generated_at"]} on {r["n_questions"]} questions from `eval/questio
   that "catches" everything by rejecting everything would score high here.
 - **Independent groundedness**: a judge from a third model family (not the drafter's, not the
   verifier's) checks claims cited in final reports against their sources.
-- **Agreement with hand labels**: the owner labelled claims by reading the source text; n/a until
-  `eval/gold/claims_gold.jsonl` is filled in.
+- **Agreement with hand labels**: {gold_note}
 
 ## Models
 

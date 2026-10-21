@@ -51,8 +51,16 @@ async def run_research(run_id: str, deps: Deps) -> None:
         _finish(deps, run_id, "failed", "run cancelled: server shutting down")
         raise
     except Exception as e:  # recorded, not re-raised: runs execute as background tasks
-        status, error = "failed", f"{type(e).__name__}: {e}"
+        root = _first_leaf(e)
+        status, error = "failed", f"{type(root).__name__}: {root}"
     _finish(deps, run_id, status, error)
+
+
+def _first_leaf(e: BaseException) -> BaseException:
+    """TaskGroup wraps failures in an ExceptionGroup; report the underlying error."""
+    while isinstance(e, BaseExceptionGroup) and e.exceptions:
+        e = e.exceptions[0]
+    return e
 
 
 def _finish(deps: Deps, run_id: str, status: str, error: str | None) -> None:
