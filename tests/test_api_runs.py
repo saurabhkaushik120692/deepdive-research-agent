@@ -144,3 +144,24 @@ def test_rate_limit_ignores_runs_older_than_an_hour(client_rate_1, deps):
         s.add(Run(question=Q, models={}, created_at=datetime.now(UTC) - timedelta(hours=2)))
         s.commit()
     assert client_rate_1.post("/api/runs", json={"question": Q}).status_code == 202
+
+
+def test_non_ascii_access_code_is_rejected_cleanly(client_with_code):
+    r = client_with_code.post("/access", data={"code": "pässwörd-ü"}, follow_redirects=False)
+    assert r.status_code == 401
+
+
+def test_access_cookie_is_secure_behind_https_proxy(client_with_code):
+    r = client_with_code.post(
+        "/access",
+        data={"code": "secret"},
+        headers={"X-Forwarded-Proto": "https"},
+        follow_redirects=False,
+    )
+    cookie = r.headers["set-cookie"].lower()
+    assert "secure" in cookie and "httponly" in cookie and "samesite=lax" in cookie
+
+
+def test_access_cookie_not_secure_on_plain_http_dev(client_with_code):
+    r = client_with_code.post("/access", data={"code": "secret"}, follow_redirects=False)
+    assert "secure" not in r.headers["set-cookie"].lower()

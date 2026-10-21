@@ -18,7 +18,10 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    env_file: .env          # provides SITE_HOST, e.g. 13-201-5-7.nip.io
+    environment:
+      # Only the hostname: Caddy never needs the app's API keys. Compose reads SITE_HOST from
+      # /opt/deepdive/.env for this substitution without passing the rest of the file.
+      SITE_HOST: ${SITE_HOST}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
