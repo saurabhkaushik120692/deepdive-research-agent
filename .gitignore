@@ -2,7 +2,7 @@
 .env
 
 # local data (SQLite DB, Chroma store)
-data/
+/data/
 
 # python
 .venv/
