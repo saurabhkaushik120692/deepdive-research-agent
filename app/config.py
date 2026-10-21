@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     chunk_words: int = 600
     chunk_overlap_words: int = 75
     chunk_max_chars: int = 3000
-    embed_max_chars: int = 1000  # embedding input limit is 2048 tokens; dense text ~1 char/token
+    embed_max_chars: int = 2400  # most of a chunk; model input limit is 2048 tokens
+    embed_fallback_chars: int = 1000  # retry size when unusually dense text is still too long
     max_chunks_per_source: int = 40
     top_k_chunks: int = 6
 

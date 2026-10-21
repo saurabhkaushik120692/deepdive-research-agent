@@ -126,3 +126,29 @@ async def test_verifier_probe_counts_api_errors_instead_of_crashing(deps):
     deps.llm.handlers["verifier"] = broken_verifier
     probe = await verifier_probe(deps, [run.id], random.Random(1), kinds=("number",))
     assert probe["errors"] > 0 and probe["n_originals"] == 6
+
+
+# --- embedding coverage: embed most of each chunk, fall back when an input is too long ------
+
+
+async def test_embedding_covers_most_of_a_chunk(settings):
+    fake = FakeOpenAI()
+    await MeshLlm(settings, client=fake).embed(["x" * 3000])
+    assert settings.embed_max_chars >= 2400
+    assert len(fake.embed_calls[0]["input"][0]) == settings.embed_max_chars
+
+
+async def test_too_long_embedding_input_falls_back_to_shorter_text(settings):
+    fake = FakeOpenAI(embed_max_len=2000)
+    vecs = await MeshLlm(settings, client=fake).embed(["short text", "y" * 3000])
+    assert len(vecs) == 2
+    retry = fake.embed_calls[-1]["input"]
+    assert all(len(t) <= settings.embed_fallback_chars for t in retry)
+    assert vecs[0] == [10.0, 1.0]  # the short input is unchanged in the retry
+
+
+async def test_embedding_fallback_gives_up_after_one_retry(settings):
+    fake = FakeOpenAI(embed_max_len=5)
+    with pytest.raises(openai.BadRequestError):
+        await MeshLlm(settings, client=fake).embed(["this is longer than five"])
+    assert len(fake.embed_calls) == 2

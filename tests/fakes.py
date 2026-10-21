@@ -4,6 +4,8 @@ import hashlib
 from collections.abc import Callable
 from types import SimpleNamespace
 
+import httpx
+import openai
 from pydantic import BaseModel
 
 from app.deps import SearchResult
@@ -30,6 +32,14 @@ class _FakeEmbeddings:
 
     async def create(self, **kwargs):
         self._owner.embed_calls.append(kwargs)
+        limit = self._owner.embed_max_len
+        if limit is not None and any(len(t) > limit for t in kwargs["input"]):
+            req = httpx.Request("POST", "https://api.meshapi.ai/v1/embeddings")
+            raise openai.BadRequestError(
+                "input too long for the model's context length",
+                response=httpx.Response(400, request=req),
+                body=None,
+            )
         data = [SimpleNamespace(embedding=[float(len(t)), 1.0]) for t in kwargs["input"]]
         return SimpleNamespace(data=data)
 
@@ -46,8 +56,9 @@ class _FakeModerations:
 class FakeOpenAI:
     """Stands in for openai.AsyncOpenAI: scripted chat replies (str or Exception)."""
 
-    def __init__(self, chat=None, usage=(10, 5), moderation_flagged=False):
+    def __init__(self, chat=None, usage=(10, 5), moderation_flagged=False, embed_max_len=None):
         self._chat = list(chat or [])
+        self.embed_max_len = embed_max_len
         self._usage = usage
         self._flagged = moderation_flagged
         self.chat_calls: list[dict] = []

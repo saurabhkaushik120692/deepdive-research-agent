@@ -187,18 +187,26 @@ class MeshLlm:
         )
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        """Embed in batches: embedding endpoints cap inputs/tokens per request."""
+        """Embed in batches: embedding endpoints cap inputs/tokens per request.
+
+        Inputs are cut to embed_max_chars (most of a chunk). Unusually dense text can still exceed
+        the model's 2048-token input limit; that batch is retried once at embed_fallback_chars."""
         vectors: list[list[float]] = []
         for start in range(0, len(texts), EMBED_BATCH):
-            resp = await self._call(
-                self.client.embeddings.create,
-                model=self.settings.model_embed,
-                input=[
-                    t[: self.settings.embed_max_chars] for t in texts[start : start + EMBED_BATCH]
-                ],
-            )
+            batch = texts[start : start + EMBED_BATCH]
+            try:
+                resp = await self._embed_batch(batch, self.settings.embed_max_chars)
+            except openai.BadRequestError:
+                resp = await self._embed_batch(batch, self.settings.embed_fallback_chars)
             vectors += [item.embedding for item in resp.data]
         return vectors
+
+    async def _embed_batch(self, batch: list[str], max_chars: int):
+        return await self._call(
+            self.client.embeddings.create,
+            model=self.settings.model_embed,
+            input=[t[:max_chars] for t in batch],
+        )
 
     async def moderate(self, text: str) -> bool:
         resp = await self._call(
