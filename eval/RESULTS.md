@@ -1,6 +1,6 @@
 # DeepDive self-evaluation results
 
-Generated 2026-10-20 16:59 UTC on 24 questions from `eval/questions.jsonl`.
+Generated 2026-10-21 15:33 UTC on 24 questions from `eval/questions.jsonl`.
 
 | Metric | Value |
 |---|---|
@@ -13,8 +13,8 @@ Generated 2026-10-20 16:59 UTC on 24 questions from `eval/questions.jsonl`.
 | Wrongful rejection rate (re-verified supported claims) | 0.0% of 60 |
 | Probe / judge calls that errored (excluded from the rates above) | 0 / 0 |
 | Independent groundedness (judge: google/gemini-2.5-flash-lite) | 94.0% of 100 |
-| Agreement with hand labels (accuracy) | n/a of 0 |
-| Agreement with hand labels (Cohen's kappa) | n/a |
+| Agreement with hand labels (accuracy) | 86.0% of 50 |
+| Agreement with hand labels (Cohen's kappa) | 0.70 |
 | Quote validity rate | 99.5% |
 | Drafted claims supported / partial / rejected | 1200 / 125 / 108 of 1433 |
 | Draft claims rejected by verifier | 7.5% |
