@@ -1,5 +1,6 @@
 from collections import Counter
 
+import openai
 from langchain_core.runnables import RunnableConfig
 from sqlmodel import select
 
@@ -101,7 +102,7 @@ async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
         ]
         allowed = {c.id for c in verified}
 
-        fallback = False
+        fallback = None
         if verified:
             try:
                 synthesis = await deps.llm.chat_json(
@@ -111,9 +112,11 @@ async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
                     schema=SynthesisOutput,
                     run_id=run_id,
                 )
-            except LlmOutputError:
-                # The claims are already verified: list them rather than lose the run.
-                synthesis, fallback = _fallback_synthesis(question, sub_questions, verified), True
+            except (LlmOutputError, openai.APIError) as e:
+                # Bad output, or Mesh timed out / errored even after retries. The claims are
+                # already verified: list them rather than lose the whole run at its last step.
+                synthesis = _fallback_synthesis(question, sub_questions, verified)
+                fallback = f"{type(e).__name__}: {e}"
         else:
             synthesis = SynthesisOutput(
                 title=question,
@@ -124,7 +127,9 @@ async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
 
         with deps.session_factory() as session:
             if fallback:
-                log_event(session, run_id, "synthesizer", "synthesis_fallback", {})
+                log_event(
+                    session, run_id, "synthesizer", "synthesis_fallback", {"reason": fallback}
+                )
             all_numbers = set().union(*(_numbers(c.text) for c in verified))
             if not _numbers(synthesis.summary) <= all_numbers:
                 log_event(

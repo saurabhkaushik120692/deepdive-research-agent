@@ -89,6 +89,31 @@ async def test_synthesizer_failure_falls_back_to_verified_claims(deps):
     assert "A fact 1 round 0" in md and "synthesis_fallback" in event_types(deps, run.id)
 
 
+def _api_error(kind):
+    import httpx
+    import openai
+
+    req = httpx.Request("POST", "https://api.meshapi.ai/v1/chat/completions")
+    if kind == "timeout":
+        return openai.APITimeoutError(request=req)
+    return openai.InternalServerError(
+        "upstream 502", response=httpx.Response(502, request=req), body=None
+    )
+
+
+@pytest.mark.parametrize("kind", ["timeout", "server_error"])
+async def test_synthesizer_api_failure_still_produces_a_report(deps, kind):
+    """A live run timed out twice at this last step and lost 61 verified claims."""
+    script_happy_path(deps)
+    deps.llm.handlers["synthesizer"] = lambda s, u: _api_error(kind)
+    run = create_run(deps.session_factory(), "q", deps.settings)
+    await run_research(run.id, deps)
+    assert get_run(deps, run.id).status == "completed"
+    assert "A fact 1 round 0" in report_of(deps, run.id).markdown
+    fallback = [e for e in events(deps, run.id) if e.type == "synthesis_fallback"]
+    assert fallback and "Error" in fallback[0].payload["reason"]
+
+
 # --- I3: runs orphaned by a restart are marked failed on startup -----------------------
 
 

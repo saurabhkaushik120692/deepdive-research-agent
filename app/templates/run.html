@@ -117,6 +117,7 @@
     query_refined: (d) => item(`Refine #${d.sub_question_id}`, "rewrote the search query", `${quote(d.old_query)} → ${quote(d.new_query)}`, "info"),
     conflict_found: (d) => { s.conflicts += 1; item("Contradictions", "sources disagree", d.explanation, "warn"); },
     paragraph_dropped: () => item("Synthesizer", "dropped a paragraph that cited unverified claims", "", "bad"),
+    synthesis_fallback: (d) => item("Synthesizer", "couldn't write the prose report in time, so it lists the verified claims instead", d.reason || "", "warn"),
     report_written: (d) => { s.finished = true; item("Synthesizer", "wrote the report from verified claims only", `${d.supported} supported · ${d.partial} partial · ${d.unsupported} rejected`, "good"); },
     run_completed: () => { s.finished = true; s.stage = 6; item("Run", "completed", "", "good"); },
     run_failed: (d) => item("Run", "failed", d.error, "bad"),
