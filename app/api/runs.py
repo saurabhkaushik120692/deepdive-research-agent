@@ -116,6 +116,18 @@ def get_trail(run_id: str, request: Request) -> dict:
         )
 
 
+def _claim_texts(session, events: list[Event]) -> dict[int, str]:
+    """Claim text for verdict events, so the live feed can show what was checked."""
+    ids = [
+        e.payload["claim_id"]
+        for e in events
+        if e.type == "claim_verified" and (e.payload or {}).get("claim_id")
+    ]
+    if not ids:
+        return {}
+    return dict(session.exec(select(Claim.id, Claim.text).where(Claim.id.in_(ids))).all())
+
+
 @router.get("/runs/{run_id}/events")
 async def stream_events(run_id: str, request: Request):
     """SSE: replay the run's events (after Last-Event-ID), follow new ones, then send `done`."""
@@ -137,9 +149,12 @@ async def stream_events(run_id: str, request: Request):
                     .order_by(Event.id)
                 ).all()
                 status = session.get(Run, run_id).status
+                texts = _claim_texts(session, new)
             for e in new:
                 last_id = e.id
                 payload = {"node": e.node, "ts": e.ts.isoformat(), **(e.payload or {})}
+                if e.type == "claim_verified" and payload.get("claim_id") in texts:
+                    payload.setdefault("text", texts[payload["claim_id"]])
                 yield {"id": str(e.id), "event": e.type, "data": json.dumps(payload, default=str)}
             if status in TERMINAL and not new:
                 yield {"event": "done", "data": json.dumps({"status": status})}

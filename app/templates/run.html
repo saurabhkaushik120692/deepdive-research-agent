@@ -1,59 +1,181 @@
 {% extends "base.html" %}
 {% block title %}Run{% endblock %}
 {% block content %}
-<hgroup>
-  <h2>{{ run.question }}</h2>
-  <p><span id="run-status" class="badge status-{{ run.status }}">{{ run.status }}</span>
-     · <a href="/runs/{{ run.id }}/trail">audit trail</a></p>
-</hgroup>
+<div class="run-head">
+  <h1>{{ run.question }}</h1>
+  <div class="run-meta">
+    <span id="run-status" class="pill status-{{ run.status }}">{{ run.status }}</span>
+    <span id="run-clock" {% if run.started_at and not run.finished_at %}data-started="{{ run.started_at.isoformat() }}"{% endif %}>{{ duration }}</span>
+    <span id="run-round"></span>
+    <a href="/runs/{{ run.id }}/trail">Audit trail</a>
+  </div>
+</div>
 
-<details open class="no-print">
-  <summary>Live agent timeline</summary>
-  <ol id="timeline" class="timeline" data-events-url="/api/runs/{{ run.id }}/events"></ol>
+<details id="live"{% if not view %} open{% endif %} class="no-print">
+  <summary>{% if view %}How this report was made: the agent timeline{% else %}Live agent timeline{% endif %}</summary>
+  <div class="three-col">
+    <aside>
+      <p class="eyebrow">Progress</p>
+      <ol class="rail">
+        <li data-stage="plan"><span class="label">Plan</span><span class="n"></span></li>
+        <li data-stage="research"><span class="label">Research</span><span class="n"></span></li>
+        <li data-stage="draft"><span class="label">Draft claims</span><span class="n"></span></li>
+        <li data-stage="verify"><span class="label">Verify</span><span class="n"></span></li>
+        <li data-stage="loop"><span class="label">Loop check</span><span class="n"></span></li>
+        <li data-stage="report"><span class="label">Report</span><span class="n"></span></li>
+      </ol>
+    </aside>
+    <section class="col-main">
+      <div class="feed-tools">
+        <p class="eyebrow">What the agents are doing <span class="muted">(newest first)</span></p>
+        <span>
+          <label><input type="checkbox" id="show-noise">Skipped sources</label>
+          <button type="button" id="replay" class="secondary outline" hidden>Replay</button>
+        </span>
+      </div>
+      <ol id="feed" class="feed" data-events-url="/api/runs/{{ run.id }}/events"></ol>
+      <p id="feed-empty" class="feed-empty">Waiting for the first event…</p>
+    </section>
+    <aside>
+      <p class="eyebrow">Verdicts so far</p>
+      <div class="stat good"><strong data-count="supported">0</strong><span>supported</span></div>
+      <div class="stat warn"><strong data-count="partial">0</strong><span>partial</span></div>
+      <div class="stat bad"><strong data-count="unsupported">0</strong><span>rejected</span></div>
+      <div class="stat"><strong data-count="conflicts">0</strong><span>source conflicts</span></div>
+    </aside>
+  </div>
 </details>
 
-<div id="report" aria-live="polite"></div>
+<div id="report" aria-live="polite">{% if view %}{% include "_report_body.html" %}{% endif %}</div>
 
 <script>
 (() => {
-  const list = document.getElementById("timeline");
+  const live = document.getElementById("live");
+  const feed = document.getElementById("feed");
+  const empty = document.getElementById("feed-empty");
+  const replayBtn = document.getElementById("replay");
   const statusEl = document.getElementById("run-status");
-  const add = (text, cls = "") => {
+  const clock = document.getElementById("run-clock");
+  const roundEl = document.getElementById("run-round");
+  const reportEl = document.getElementById("report");
+  const STAGES = ["plan", "research", "draft", "verify", "loop", "report"];
+  const NODE_STAGE = {planner: 0, researcher: 1, drafter: 2, verifier: 3, refine: 4, contradictions: 5, synthesizer: 5};
+  const received = [];
+  let s;
+
+  const reset = () => {
+    s = {stage: -1, max: -1, round: 0, subqs: 0, results: 0, drafted: 0, verified: 0, loops: 0, finished: false,
+         supported: 0, partial: 0, unsupported: 0, conflicts: 0};
+    feed.replaceChildren();
+    empty.hidden = false;
+  };
+  const enter = (i) => { s.stage = i; s.max = Math.max(s.max, i); };
+  const item = (who, what, detail = "", cls = "") => {
     const li = document.createElement("li");
     li.className = cls;
-    li.textContent = text;
-    list.appendChild(li);
+    const b = document.createElement("span");
+    b.className = "who";
+    b.textContent = who;
+    li.append(b, what);
+    if (detail) { const sm = document.createElement("small"); sm.textContent = detail; li.append(sm); }
+    feed.prepend(li);
+    empty.hidden = true;
   };
-  const fmt = {
-    run_started: () => ["Run started"],
-    sub_questions_planned: (d) => [`Planner: ${d.sub_questions.length} sub-questions: ` + d.sub_questions.map((q) => `#${q.id} ${q.text}`).join(" · ")],
-    search_done: (d) => [`Researcher #${d.sub_question_id} (round ${d.round}): "${d.query}" gave ${d.n_results} results, ${d.n_new_chunks} new evidence chunks`],
-    source_skipped: (d) => [`Researcher #${d.sub_question_id}: skipped ${d.url} (${d.reason})`, "muted"],
-    no_evidence: (d) => [`Drafter #${d.sub_question_id}: no evidence to draft from`, "warn"],
-    claims_drafted: (d) => [`Drafter #${d.sub_question_id}: ${d.n_claims} claims drafted`],
-    claim_dropped_bad_citation: (d) => [`Drafter: dropped "${d.text}" (cited evidence it wasn't given)`, "bad"],
-    claim_verified: (d) => [`Verifier: claim ${d.claim_id} is ${d.label.toUpperCase()}: ${d.reason}`, d.label === "unsupported" ? "bad" : d.label === "partial" ? "warn" : "good"],
-    loop_decision: (d) => d.looping
-      ? [`Loop: sub-questions ${d.thin_ids.map((i) => "#" + i).join(", ")} have too little verified support, researching again (round ${d.round + 1})`, "warn"]
-      : [d.thin_ids.length ? `Loop limit reached; ${d.thin_ids.length} sub-question(s) stay thin` : "Every sub-question has enough verified support, writing report", "good"],
-    query_refined: (d) => [`Refine #${d.sub_question_id}: "${d.old_query}" → "${d.new_query}"`],
-    paragraph_dropped: (d) => [`Synthesizer: dropped a paragraph citing unverified claims`, "bad"],
-    conflict_found: (d) => [`Conflict between claims ${d.claim_a} and ${d.claim_b}: ${d.explanation}`, "warn"],
-    report_written: (d) => [`Report written: ${d.supported} supported, ${d.partial} partial, ${d.unsupported} rejected`, "good"],
-    run_completed: () => ["Run completed", "good"],
-    run_failed: (d) => [`Run failed: ${d.error}`, "bad"],
+  const quote = (t) => `"${t}"`;
+
+  const handlers = {
+    node_started: (d) => { if (d.node in NODE_STAGE) enter(NODE_STAGE[d.node]); if (d.round) s.round = d.round; },
+    run_started: () => item("Run", "started", "", "info"),
+    sub_questions_planned: (d) => {
+      s.subqs = d.sub_questions.length;
+      item("Planner", `split the question into ${s.subqs} sub-questions`, d.sub_questions.map((q) => `#${q.id} ${q.text}`).join("  ·  "), "info");
+    },
+    search_done: (d) => {
+      s.results += d.n_results;
+      item(`Researcher #${d.sub_question_id}`, `found ${d.n_results} results, ${d.n_new_chunks} new evidence chunks`, `query: ${quote(d.query)}${d.round ? ` · round ${d.round + 1}` : ""}`);
+    },
+    source_skipped: (d) => item(`Researcher #${d.sub_question_id}`, `skipped a source (${d.reason})`, d.url, "noise"),
+    no_evidence: (d) => item(`Drafter #${d.sub_question_id}`, "had no evidence to draft from", "", "warn"),
+    claims_drafted: (d) => { s.drafted += d.n_claims; item(`Drafter #${d.sub_question_id}`, `drafted ${d.n_claims} atomic claims`); },
+    claim_dropped_bad_citation: (d) => item("Drafter", `dropped ${quote(d.text)}`, "it cited evidence it wasn't given", "bad"),
+    claim_verified: (d) => {
+      s.verified += 1;
+      s[d.label] = (s[d.label] || 0) + 1;
+      const word = {supported: "supported", partial: "partially supported", unsupported: "rejected"}[d.label] || d.label;
+      const cls = d.label === "unsupported" ? "bad" : d.label === "partial" ? "warn" : "good";
+      item("Verifier", `${word}: ${d.text ? quote(d.text) : `claim ${d.claim_id}`}`, d.reason, cls);
+    },
+    loop_decision: (d) => {
+      enter(4);
+      if (d.looping) {
+        s.loops += 1;
+        item("Loop", `${d.thin_ids.length} sub-question(s) have too little verified support, researching again`, d.thin_ids.map((i) => `#${i}`).join(", "), "warn");
+      } else {
+        item("Loop", d.thin_ids.length ? `limit reached; ${d.thin_ids.length} sub-question(s) stay thin` : "every sub-question has enough verified support", "", "good");
+      }
+    },
+    query_refined: (d) => item(`Refine #${d.sub_question_id}`, "rewrote the search query", `${quote(d.old_query)} → ${quote(d.new_query)}`, "info"),
+    conflict_found: (d) => { s.conflicts += 1; item("Contradictions", "sources disagree", d.explanation, "warn"); },
+    paragraph_dropped: () => item("Synthesizer", "dropped a paragraph that cited unverified claims", "", "bad"),
+    report_written: (d) => { s.finished = true; item("Synthesizer", "wrote the report from verified claims only", `${d.supported} supported · ${d.partial} partial · ${d.unsupported} rejected`, "good"); },
+    run_completed: () => { s.finished = true; s.stage = 6; item("Run", "completed", "", "good"); },
+    run_failed: (d) => item("Run", "failed", d.error, "bad"),
   };
-  const es = new EventSource(list.dataset.eventsUrl);
-  for (const [type, f] of Object.entries(fmt)) {
-    es.addEventListener(type, (e) => { const [t, c] = f(JSON.parse(e.data)); add(t, c); });
+
+  const render = () => {
+    STAGES.forEach((name, i) => {
+      const li = live.querySelector(`[data-stage="${name}"]`);
+      li.classList.toggle("active", i === s.stage);
+      li.classList.toggle("done", i <= s.max && i !== s.stage);
+    });
+    const n = {
+      plan: s.subqs ? `${s.subqs} sub-questions` : "",
+      research: s.results ? `${s.results} results` : "",
+      draft: s.drafted ? `${s.drafted} claims` : "",
+      verify: s.drafted ? `${s.verified} / ${s.drafted}` : "",
+      loop: s.loops ? `${s.loops} extra round${s.loops > 1 ? "s" : ""}` : s.max >= 5 ? "not needed" : "",
+      report: s.finished ? "written" : "",
+    };
+    for (const [name, text] of Object.entries(n)) live.querySelector(`[data-stage="${name}"] .n`).textContent = text;
+    for (const key of ["supported", "partial", "unsupported", "conflicts"]) live.querySelector(`[data-count="${key}"]`).textContent = s[key];
+    roundEl.textContent = s.round ? `round ${s.round + 1}` : "";
+  };
+  const handle = (type, data) => { const h = handlers[type]; if (h) { h(data); render(); } };
+
+  document.getElementById("show-noise").addEventListener("change", (e) => feed.classList.toggle("show-noise", e.target.checked));
+
+  // Replay a finished run at a watchable pace (the stream delivers it all at once).
+  replayBtn.addEventListener("click", () => {
+    reset(); render();
+    live.open = true;
+    received.forEach(([type, data], i) => setTimeout(() => handle(type, data), i * 120));
+  });
+
+  if (clock.dataset.started) {
+    const started = new Date(clock.dataset.started.endsWith("Z") || clock.dataset.started.includes("+") ? clock.dataset.started : clock.dataset.started + "Z");
+    const tick = () => { const secs = Math.max(0, Math.round((Date.now() - started) / 1000)); clock.textContent = `${Math.floor(secs / 60)} min ${secs % 60} s`; };
+    tick();
+    clock.timer = setInterval(tick, 1000);
+  }
+
+  reset(); render();
+  const es = new EventSource(feed.dataset.eventsUrl);
+  for (const type of Object.keys(handlers)) {
+    es.addEventListener(type, (e) => { const data = JSON.parse(e.data); received.push([type, data]); handle(type, data); });
   }
   es.addEventListener("done", (e) => {
     es.close();
+    clearInterval(clock.timer);
     const {status} = JSON.parse(e.data);
     statusEl.textContent = status;
-    statusEl.className = `badge status-${status}`;
-    if (status === "completed") {
-      htmx.ajax("GET", "/runs/{{ run.id }}/report?fragment=1", "#report");
+    statusEl.className = `pill status-${status}`;
+    replayBtn.hidden = received.length === 0;
+    if (status === "completed" && !reportEl.querySelector(".report")) {
+      htmx.ajax("GET", "/runs/{{ run.id }}/report?fragment=1", "#report").then(() => {
+        live.open = false;
+        live.querySelector("summary").textContent = "How this report was made: the agent timeline";
+        window.scrollTo({top: 0, behavior: "smooth"});
+      });
     }
   });
 })();

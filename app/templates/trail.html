@@ -1,30 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Audit trail{% endblock %}
 {% block content %}
-<hgroup>
-  <h2>Audit trail</h2>
-  <p>{{ run.question }} · <span class="badge status-{{ run.status }}">{{ run.status }}</span>
-    · <a href="/runs/{{ run.id }}">report</a>
-    · <a href="/api/runs/{{ run.id }}/trail" download="trail-{{ run.id }}.json">Download JSON</a></p>
-</hgroup>
+<div class="page-head">
+  <h1>Audit trail</h1>
+  <p>{{ run.question }}</p>
+  <div class="run-meta"><span class="pill status-{{ run.status }}">{{ run.status }}</span>
+    <a href="/runs/{{ run.id }}">Back to the report</a>
+    <a href="/api/runs/{{ run.id }}/trail" download="trail-{{ run.id }}.json">Download JSON</a></div>
+</div>
 {% if run.error %}<p class="bad">Error: {{ run.error }}</p>{% endif %}
 <p class="muted"><small>Models: {% for role, m in run.models.items() %}{{ role }}={{ m }}{% if not loop.last %}, {% endif %}{% endfor %}
   · tokens {{ run.prompt_tokens }} in / {{ run.completion_tokens }} out</small></p>
 
 <h3>Sub-questions</h3>
-<div class="overflow-auto"><table>
+<div class="table-card overflow-auto"><table>
   <thead><tr><th>#</th><th>Sub-question</th><th>Last query</th><th>Round</th><th>Status</th></tr></thead>
   <tbody>{% for q in sqs %}<tr><td>{{ q.id }}</td><td>{{ q.text }}</td><td><code>{{ q.query }}</code></td><td>{{ q.round }}</td><td>{{ q.status }}</td></tr>{% endfor %}</tbody>
 </table></div>
 
 <h3>Searches</h3>
-<div class="overflow-auto"><table>
+<div class="table-card overflow-auto"><table>
   <thead><tr><th>Sub-q</th><th>Round</th><th>Query</th><th>Results</th></tr></thead>
   <tbody>{% for s in searches %}<tr><td>#{{ s.sub_question_id }}</td><td>{{ s.round }}</td><td><code>{{ s.query }}</code></td><td>{{ s.n_results }}</td></tr>{% endfor %}</tbody>
 </table></div>
 
 <h3>Claims and verdicts</h3>
-<div class="overflow-auto"><table>
+<div class="table-card overflow-auto"><table>
   <thead><tr><th>#</th><th>Claim</th><th>Verdict</th><th>Quote found</th><th>Reason</th><th>Quote</th></tr></thead>
   <tbody>
   {% for c, v in claims %}
@@ -40,7 +41,7 @@
 </table></div>
 
 <h3>Events</h3>
-<div class="overflow-auto"><table class="events">
+<div class="table-card overflow-auto"><table class="events">
   <thead><tr><th>Time (UTC)</th><th>Node</th><th>Event</th><th>Details</th></tr></thead>
   <tbody>{% for e in events %}<tr><td><small>{{ e.ts.strftime("%H:%M:%S") }}</small></td><td>{{ e.node }}</td><td>{{ e.type }}</td><td><small><code>{{ e.payload | tojson }}</code></small></td></tr>{% endfor %}</tbody>
 </table></div>

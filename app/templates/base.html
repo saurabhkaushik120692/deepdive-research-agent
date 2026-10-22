@@ -1,30 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}DeepDive{% endblock %} · DeepDive Research Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
-  <link rel="stylesheet" href="/static/app.css">
-  <link rel="stylesheet" href="/static/print.css" media="print">
+  <link rel="stylesheet" href="/static/app.css?v=2">
+  <link rel="stylesheet" href="/static/print.css?v=2" media="print">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js"></script>
 </head>
 <body>
-  <header class="container no-print">
-    <nav>
-      <ul><li><a href="/" class="brand"><strong>DeepDive</strong></a> <small class="muted">self-verifying research</small></li></ul>
-      <ul>
-        <li><a href="/">Ask</a></li>
-        <li><a href="/eval">Eval</a></li>
-        <li><a href="/docs">API</a></li>
+  <header class="site-header no-print">
+    <nav class="container">
+      <a href="/" class="brand">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/><path d="m7.8 10.6 2 2 3.6-3.8"/></svg>
+        <span><strong>DeepDive</strong><small>self-verifying research</small></span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/" {% if request.url.path == "/" %}aria-current="page"{% endif %}>Ask</a></li>
+        <li><a href="/eval" {% if request.url.path == "/eval" %}aria-current="page"{% endif %}>Eval</a></li>
+        <li><a href="/docs">API docs</a></li>
+        <li><a href="https://github.com/saurabhkaushik120692/deepdive-research-agent" target="_blank" rel="noopener">GitHub</a></li>
       </ul>
     </nav>
   </header>
   <main class="container">
     {% block content %}{% endblock %}
   </main>
-  <footer class="container no-print muted">
-    <small>Every claim is checked against the exact source text it cites. Unsupported claims are removed and listed.</small>
+  <footer class="container no-print">
+    <small>Every claim is checked against the exact source text it cites. Claims the source doesn't support are removed and listed.</small>
   </footer>
 </body>
 </html>

@@ -3,6 +3,8 @@
 from typing import Literal
 from urllib.parse import urlparse
 
+TIER_LABELS = {1: "official", 2: "major news", 3: "other"}
+
 TIER1_SUFFIXES = (".gov", ".gov.in", ".edu", ".ac.uk", ".int", ".mil")
 TIER1_DOMAINS = {
     "iea.org",

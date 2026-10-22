@@ -1,4 +1,6 @@
 import json
+from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -21,10 +23,55 @@ from app.models import (
     Verdict,
 )
 from app.report import Citations
+from app.tools.tiers import TIER_LABELS
 
 ROOT = Path(__file__).resolve().parents[2]
 templates = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
 EVAL_RESULTS = ROOT / "eval" / "results"
+
+# Example chips on the home page: questions from the eval set that make good demos.
+EXAMPLES = [
+    (
+        "RBI repo rate in 2025",
+        "How did the Reserve Bank of India's repo rate change during 2025, "
+        "and what reasons did the RBI give?",
+    ),
+    (
+        "India's chip fabs",
+        "What is the status of India's semiconductor fabrication plants announced under "
+        "the India Semiconductor Mission?",
+    ),
+    (
+        "Gold price in 2025",
+        "What drove the price of gold in 2025, and how much did it change over the year?",
+    ),
+]
+
+
+def time_ago(ts: datetime, now: datetime | None = None) -> str:
+    """'3 min ago' style age; SQLite hands timestamps back without a zone, and they are UTC."""
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=UTC)
+    secs = int(((now or datetime.now(UTC)) - ts).total_seconds())
+    if secs < 60:
+        return "just now"
+    if secs < 3600:
+        return f"{secs // 60} min ago"
+    if secs < 86400:
+        return f"{secs // 3600} h ago"
+    days = secs // 86400
+    return f"{days} day{'s' if days > 1 else ''} ago"
+
+
+def duration(run: Run) -> str:
+    if run.started_at is None or run.finished_at is None:
+        return ""
+    secs = int((run.finished_at - run.started_at).total_seconds())
+    return f"{secs // 60} min {secs % 60} s"
+
+
+templates.env.filters["ago"] = time_ago
+templates.env.globals["tier_labels"] = TIER_LABELS
 
 router = APIRouter()
 
@@ -49,8 +96,12 @@ def ask(request: Request):
     if not has_access(request):
         return templates.TemplateResponse(request, "gate.html", {})
     with _deps(request).session_factory() as session:
-        recent = session.exec(select(Run).order_by(Run.created_at.desc()).limit(10)).all()
-    return templates.TemplateResponse(request, "ask.html", {"recent": recent})
+        recent = session.exec(select(Run).order_by(Run.created_at.desc()).limit(8)).all()
+    return templates.TemplateResponse(
+        request,
+        "ask.html",
+        {"recent": recent, "examples": EXAMPLES, "results": latest_eval_results()},
+    )
 
 
 @router.get("/runs/{run_id}", response_class=HTMLResponse)
@@ -59,7 +110,10 @@ def run_page(run_id: str, request: Request):
         return redirect
     with _deps(request).session_factory() as session:
         run = _run_or_404(session, run_id)
-    return templates.TemplateResponse(request, "run.html", {"run": run})
+        view = _report_view(session, run) if run.status == "completed" else None
+    return templates.TemplateResponse(
+        request, "run.html", {"run": run, "view": view, "duration": duration(run)}
+    )
 
 
 def _report_view(session, run: Run) -> dict | None:
@@ -86,7 +140,13 @@ def _report_view(session, run: Run) -> dict | None:
         paragraphs = []
         for p in section.paragraphs:
             cites = [
-                {"n": n, "url": src.url, "quote": verdicts[cid].quote if cid in verdicts else ""}
+                {
+                    "n": n,
+                    "url": src.url,
+                    "domain": src.domain,
+                    "tier": src.tier,
+                    "quote": verdicts[cid].quote if cid in verdicts else "",
+                }
                 for cid in p.claim_ids
                 for n, src in citations.sources_for(cid)
             ]
@@ -117,14 +177,23 @@ def _report_view(session, run: Run) -> dict | None:
         for cid, v in sorted(verdicts.items())
         if v.label == "unsupported"
     ]
+    labels = Counter(v.label for v in verdicts.values())
+    sources = [(citations.numbers[s.url], s) for s in citations.cited]
     return {
         "synthesis": synthesis,
         "sections": sections,
         "thin": thin,
         "conflicts": conflicts,
         "rejected": rejected,
-        "sources": [(citations.numbers[s.url], s) for s in citations.cited],
-        "metrics": report.metrics,
+        "sources": sources,
+        "counts": {
+            "total": len(claims),
+            "supported": labels["supported"],
+            "partial": labels["partial"],
+            "unsupported": labels["unsupported"],
+            "official": sum(1 for _, s in sources if s.tier == 1),
+            "rounds": (report.metrics or {}).get("rounds", 0),
+        },
     }
 
 

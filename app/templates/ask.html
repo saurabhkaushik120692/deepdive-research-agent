@@ -1,35 +1,82 @@
 {% extends "base.html" %}
 {% block title %}Ask{% endblock %}
+{% macro pct(x) %}{{ "n/a" if x is none else "%.1f%%" | format(x * 100) }}{% endmacro %}
 {% block content %}
-<hgroup>
-  <h1>Ask a research question</h1>
-  <p>A planner splits it into sub-questions, researchers gather sources, and a verifier checks every claim against the exact text it cites before anything reaches the report.</p>
-</hgroup>
+<div class="three-col">
+  <aside>
+    <p class="eyebrow">How it works</p>
+    <ol class="steps">
+      <li><span class="num">1</span><span><b>Plan</b><small>Split the question into 3-6 sub-questions</small></span></li>
+      <li><span class="num">2</span><span><b>Research in parallel</b><small>Search, read and store evidence per sub-question</small></span></li>
+      <li><span class="num">3</span><span><b>Draft claims</b><small>One fact per claim, each citing its evidence</small></span></li>
+      <li><span class="num">4</span><span><b>Verify</b><small>A different model checks each claim against only the text it cites</small></span></li>
+      <li><span class="num">5</span><span><b>Loop if thin</b><small>Weak areas get a better query and another round</small></span></li>
+      <li><span class="num">6</span><span><b>Report</b><small>Written from verified claims only; rejections listed</small></span></li>
+    </ol>
+  </aside>
 
-<form id="ask-form">
-  <textarea name="question" rows="3" minlength="10" maxlength="500" required
-    placeholder="e.g. What are the main risks of investing in the EV battery market in 2026?"></textarea>
-  <small id="ask-error" class="error" role="alert"></small>
-  <button type="submit" id="ask-btn">Start research</button>
-</form>
+  <section class="col-main">
+    <div class="hero">
+      <h1>Ask a research question</h1>
+      <p>Get a cited report in which every claim has been checked against the exact source text it cites.</p>
+    </div>
 
-{% if recent %}
-<h3>Recent runs</h3>
-<table>
-  <thead><tr><th>Question</th><th>Status</th><th>Started</th></tr></thead>
-  <tbody>
-  {% for r in recent %}
-    <tr>
-      <td><a href="/runs/{{ r.id }}">{{ r.question }}</a></td>
-      <td><span class="badge status-{{ r.status }}">{{ r.status }}</span></td>
-      <td><small>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</small></td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% endif %}
+    <form id="ask-form" class="card ask-card">
+      <textarea id="question" name="question" rows="3" minlength="10" maxlength="500" required
+        placeholder="What are the main risks of investing in the EV battery market in 2026?"></textarea>
+      <div class="chips">
+        <span>Try:</span>
+        {% for label, q in examples %}
+          <button type="button" class="chip" data-example="{{ q }}">{{ label }}</button>
+        {% endfor %}
+      </div>
+      <small id="ask-error" class="error" role="alert"></small>
+      <button type="submit" id="ask-btn">Start research</button>
+    </form>
+
+    {% if recent %}
+    <div class="run-list">
+      <p class="eyebrow">Recent runs</p>
+      <div class="card">
+        {% for r in recent %}
+          <a class="run-row" href="/runs/{{ r.id }}">
+            <span class="q">{{ r.question }}</span>
+            <span class="meta">
+              <span class="pill status-{{ r.status }}">{{ {"completed": "done"}.get(r.status, r.status) }}</span>
+              <span>{{ r.created_at | ago }}</span>
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  <aside>
+    <p class="eyebrow">Measured on {{ results.n_questions if results else 24 }} questions</p>
+    {% if results %}
+      {% set p = results.verifier_probe %}
+      {% set j = results.independent_judge %}
+      {% set g = results.gold %}
+      <div class="stat good"><strong>{{ pct(p.catch_rate) }}</strong><span>planted false claims caught</span><small>of {{ p.n_mutants }}, by the verifier</small></div>
+      <div class="stat good"><strong>{{ pct(p.wrongful_rejection_rate) }}</strong><span>true claims wrongly rejected</span><small>of {{ p.n_originals }} re-checked</small></div>
+      <div class="stat"><strong>{{ pct(j.groundedness) }}</strong><span>report claims grounded</span><small>per an independent judge model</small></div>
+      <div class="stat"><strong>{{ pct(g.accuracy) }}</strong><span>agreement with hand labels</span><small>{{ g.n_labelled }} claims labelled by hand</small></div>
+      {% if results.cost and results.latency_s %}
+        <p class="side-note">About ${{ "%.2f" | format(results.cost.per_run_usd.mean) }} and {{ (results.latency_s.p50 / 60) | round | int }} min per research run.</p>
+      {% endif %}
+    {% else %}
+      <p class="side-note">No eval results yet.</p>
+    {% endif %}
+    <a href="/eval" class="side-note">See the full eval &rarr;</a>
+  </aside>
+</div>
 
 <script>
+const questionBox = document.getElementById("question");
+document.querySelectorAll("[data-example]").forEach((chip) => {
+  chip.addEventListener("click", () => { questionBox.value = chip.dataset.example; questionBox.focus(); });
+});
 document.getElementById("ask-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("ask-btn");

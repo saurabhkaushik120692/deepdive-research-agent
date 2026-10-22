@@ -2,10 +2,10 @@
 {% block title %}Self-evaluation{% endblock %}
 {% macro pct(x) %}{{ "n/a" if x is none else "%.1f%%" | format(x * 100) }}{% endmacro %}
 {% block content %}
-<hgroup>
-  <h2>Self-evaluation</h2>
+<div class="page-head">
+  <h1>Self-evaluation</h1>
   <p>How well does the verifier actually work? Measured on {{ results.n_questions if results else "the" }} test questions. Full table and method in <code>eval/RESULTS.md</code>.</p>
-</hgroup>
+</div>
 {% if not results %}
   <p>No eval results yet. Run <code>uv run python -m eval.run</code> to produce them.</p>
 {% else %}
@@ -38,6 +38,7 @@
   </div>
 
   <h3>Catch rate by kind of planted error</h3>
+  <div class="card">
   <figure class="bars" aria-label="Verifier catch rate by mutation kind">
     {% for kind, rate in p.catch_rate_by_kind.items() %}
       <div class="bar-row" data-kind="{{ kind }}">
@@ -47,6 +48,7 @@
       </div>
     {% endfor %}
   </figure>
-  <p class="muted"><small>number: a figure changed · year: a date shifted · negation: direction flipped (rose↔fell, is↔is not) · entity: a different organisation or country named.</small></p>
+  <p class="muted" style="margin: 0"><small>number: a figure changed · year: a date shifted · negation: direction flipped (rose↔fell, is↔is not) · entity: a different organisation or country named.</small></p>
+  </div>
 {% endif %}
 {% endblock %}
