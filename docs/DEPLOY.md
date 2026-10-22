@@ -170,7 +170,9 @@ for data and deletion requests.
 
 Also set `SESSION_SECRET` (a random string, see the `.env` template above): it signs the login
 cookie, so changing it signs everyone out. After editing the server's `.env`, restart the app:
-`cd /opt/deepdive && sudo docker compose -f docker-compose.prod.yml up -d`.
+`cd /opt/deepdive && sudo docker compose -f docker-compose.prod.yml up -d --force-recreate app`
+(each deploy tags the image it starts as `latest` on the instance, so this restarts the deployed
+version; if in doubt, run `... pull app` first).
 
 If Google rejects the `nip.io` address in step 3, the site needs a real domain name (a few dollars
 a year): point it at the Elastic IP, set `SITE_HOST` to it, and use it in step 3.

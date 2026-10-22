@@ -89,6 +89,7 @@ jobs:
             "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $REGISTRY",
             "export ECR_REGISTRY=$REGISTRY ECR_REPOSITORY=$ECR_REPOSITORY IMAGE_TAG=$TAG",
             "docker compose -f docker-compose.prod.yml pull",
+            "docker tag $REGISTRY/$ECR_REPOSITORY:$TAG $REGISTRY/$ECR_REPOSITORY:latest",
             "docker compose -f docker-compose.prod.yml up -d --remove-orphans",
             "docker image prune -f",
             "for i in \$(seq 1 24); do docker compose -f docker-compose.prod.yml ps app | grep -q '(healthy)' && exit 0; sleep 5; done; docker compose -f docker-compose.prod.yml ps; echo 'app not healthy: check logs on the instance (docker compose logs app)'; exit 1"
