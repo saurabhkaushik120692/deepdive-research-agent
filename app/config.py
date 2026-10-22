@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     llm_rpm: int = Field(default=80, gt=0)  # Mesh allows 100 requests/minute per account
     llm_concurrency: int = 8
     llm_timeout_s: float = 180.0  # reasoning models (gpt-5-nano) often need 60-120 s per call
+    # At the default effort the report writer thinks ~7,000 hidden tokens (about 2 min, sometimes
+    # past the timeout); "low" writes comparable reports in 20-45 s. Empty = model default.
+    reasoning_effort_synthesizer: str = "low"
 
     # Google sign-in. site_host is the public hostname (the deploy sets it for Caddy too):
     # when set, sign-in returns to https://<site_host>/ and the session cookie is HTTPS-only.

@@ -9,6 +9,8 @@ Rules:
   unless the claim itself names that source. Otherwise state the fact without attribution;
   the citations show where it came from.
 - Every paragraph must list in `claim_ids` the ids of all claims it relies on (at least one).
+- Cover every claim: each claim id you are given should appear in the `claim_ids` of at least one
+  paragraph. Group closely related claims into one paragraph rather than leaving any out.
 - The labels and notes are for you only. Never copy "[claim:…]", "source tier", "partial" or
   "only partly supported" into the text.
 - Organise the report into sections that answer the research question; a section per theme or

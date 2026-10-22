@@ -62,3 +62,19 @@ async def test_embed_uses_embed_model(settings):
     vecs = await _llm(settings, fake).embed(["ab", "abcd"])
     assert vecs == [[2.0, 1.0], [4.0, 1.0]]
     assert fake.embed_calls[0]["model"] == settings.model_embed
+
+
+async def test_synthesizer_gets_its_reasoning_effort(settings):
+    fake = FakeOpenAI(chat=['{"answer": "a"}', '{"answer": "b"}'])
+    llm = _llm(settings, fake)
+    await llm.chat_json(role="synthesizer", system="s", user="u", schema=Out)
+    await llm.chat_json(role="verifier", system="s", user="u", schema=Out)
+    assert fake.chat_calls[0]["reasoning_effort"] == settings.reasoning_effort_synthesizer == "low"
+    assert "reasoning_effort" not in fake.chat_calls[1]
+
+
+async def test_empty_reasoning_effort_uses_the_model_default(settings):
+    settings.reasoning_effort_synthesizer = ""
+    fake = FakeOpenAI(chat=['{"answer": "a"}'])
+    await _llm(settings, fake).chat_json(role="synthesizer", system="s", user="u", schema=Out)
+    assert "reasoning_effort" not in fake.chat_calls[0]

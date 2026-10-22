@@ -140,6 +140,8 @@ class MeshLlm:
         self, *, role: Role, system: str, user: str, schema: type[T], run_id: str | None = None
     ) -> T:
         model = getattr(self.settings, f"model_{role}")
+        effort = getattr(self.settings, f"reasoning_effort_{role}", "")
+        extra = {"reasoning_effort": effort} if effort else {}
         messages = [
             {"role": "system", "content": system + _schema_instructions(schema)},
             {"role": "user", "content": user},
@@ -152,6 +154,7 @@ class MeshLlm:
                 model=model,
                 messages=messages,
                 response_format={"type": "json_object"},
+                **extra,
             )
             self._report_usage(run_id, role, model, resp, started)
             content = resp.choices[0].message.content or ""

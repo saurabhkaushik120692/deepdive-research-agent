@@ -17,7 +17,16 @@ from app.models import Run
 from app.tools.fetch import HttpFetcher
 from app.tools.quote_match import quote_in_chunk
 from tests.fakes import FakeOpenAI
-from tests.helpers import cfg, chunk_count, claims_of, event_types, events, get_run, report_of
+from tests.helpers import (
+    cfg,
+    chunk_count,
+    claims_of,
+    event_types,
+    events,
+    get_run,
+    report_of,
+    verdict_of,
+)
 from tests.scripts import _drafter, script_happy_path
 
 # --- I1: re-drafted duplicates must not satisfy the loop rule ---------------------------
@@ -349,3 +358,59 @@ async def test_drafter_and_contradictions_run_subquestions_concurrently(deps):
     await run_research(run.id, deps)
     assert get_run(deps, run.id).status == "completed"
     assert probe.peak["drafter"] == 3 and probe.peak["contradictions"] == 3
+
+
+# --- every verified claim reaches the report ----------------------------------------------
+
+
+def _synth_citing(pick):
+    """A synthesizer that cites only the claim ids `pick` chooses, one paragraph each."""
+
+    def synth(system, user):
+        ids = [int(x) for x in re.findall(r"\[claim:(\d+)\]", user)]
+        paragraphs = [Paragraph(text="Prose about a finding.", claim_ids=[i]) for i in pick(ids)]
+        return SynthesisOutput(
+            title="T", summary="S.", sections=[Section(heading="H", paragraphs=paragraphs)]
+        )
+
+    return synth
+
+
+async def test_claims_the_prose_leaves_out_are_listed_at_the_end(deps):
+    script_happy_path(deps)
+    deps.llm.handlers["synthesizer"] = _synth_citing(lambda ids: ids[:1])
+    run = create_run(deps.session_factory(), "q", deps.settings)
+    await run_research(run.id, deps)
+    md = report_of(deps, run.id).markdown
+    assert "## Other verified findings" in md
+    verified = [c for c in claims_of(deps, run.id) if verdict_of(deps, c.id).label != "unsupported"]
+    for c in verified[1:]:
+        assert c.text in md
+    added = [e for e in events(deps, run.id) if e.type == "claims_appended"]
+    assert len(added[0].payload["claim_ids"]) == len(verified) - 1
+
+
+async def test_no_extra_section_when_the_prose_covers_everything(deps):
+    script_happy_path(deps)
+    deps.llm.handlers["synthesizer"] = _synth_citing(lambda ids: ids)
+    run = create_run(deps.session_factory(), "q", deps.settings)
+    await run_research(run.id, deps)
+    assert "Other verified findings" not in report_of(deps, run.id).markdown
+    assert "claims_appended" not in event_types(deps, run.id)
+
+
+async def test_claims_from_a_dropped_paragraph_are_listed_not_lost(deps):
+    script_happy_path(deps)
+
+    def synth(system, user):
+        ids = [int(x) for x in re.findall(r"\[claim:(\d+)\]", user)]
+        bad = Paragraph(text="Grew 77% in 2099.", claim_ids=ids)  # figures no claim states
+        return SynthesisOutput(
+            title="T", summary="S.", sections=[Section(heading="H", paragraphs=[bad])]
+        )
+
+    deps.llm.handlers["synthesizer"] = synth
+    run = create_run(deps.session_factory(), "q", deps.settings)
+    await run_research(run.id, deps)
+    md = report_of(deps, run.id).markdown
+    assert "77%" not in md and "## Other verified findings" in md and "A fact 1 round 0" in md

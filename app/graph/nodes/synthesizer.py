@@ -49,6 +49,17 @@ def _paragraph_problem(p, allowed: set[int], claims: dict[int, Claim]) -> str | 
     return None
 
 
+OTHER_FINDINGS = "Other verified findings"
+
+
+def _left_out(synthesis: SynthesisOutput, verified: list[Claim], sub_questions) -> list[Claim]:
+    """Verified claims no paragraph cites, in sub-question order."""
+    cited = {i for sec in synthesis.sections for p in sec.paragraphs for i in p.claim_ids}
+    order = {sq.id: n for n, sq in enumerate(sub_questions)}
+    missing = [c for c in verified if c.id not in cited]
+    return sorted(missing, key=lambda c: (order.get(c.sub_question_id, len(order)), c.id))
+
+
 def _fallback_synthesis(question, sub_questions, verified) -> SynthesisOutput:
     sections = []
     for sq in sub_questions:
@@ -157,6 +168,23 @@ async def synthesize_node(state: ResearchState, config: RunnableConfig) -> dict:
                         )
                 section.paragraphs = kept
             synthesis.sections = [s for s in synthesis.sections if s.paragraphs]
+            left_out = _left_out(synthesis, verified, sub_questions)
+            if left_out:
+                # Every verified claim reaches the report, even ones the prose skipped or that sat
+                # in a dropped paragraph: listed as one cited line each.
+                synthesis.sections.append(
+                    Section(
+                        heading=OTHER_FINDINGS,
+                        paragraphs=[Paragraph(text=c.text, claim_ids=[c.id]) for c in left_out],
+                    )
+                )
+                log_event(
+                    session,
+                    run_id,
+                    "synthesizer",
+                    "claims_appended",
+                    {"claim_ids": [c.id for c in left_out]},
+                )
 
             thin_texts = [sq.text for sq in sub_questions if sq.status == "thin"]
             markdown = render_report(
