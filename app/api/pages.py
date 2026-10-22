@@ -261,6 +261,23 @@ def latest_eval_results() -> dict | None:
     return json.loads(files[-1].read_text(encoding="utf-8")) if files else None
 
 
+LEGAL_UPDATED = "22 October 2026"
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+def privacy_page(request: Request):
+    return templates.TemplateResponse(request, "privacy.html", _legal_context(request))
+
+
+@router.get("/terms", response_class=HTMLResponse)
+def terms_page(request: Request):
+    return templates.TemplateResponse(request, "terms.html", _legal_context(request))
+
+
+def _legal_context(request: Request) -> dict:
+    return {"contact": _deps(request).settings.contact_email, "updated": LEGAL_UPDATED}
+
+
 @router.get("/eval", response_class=HTMLResponse)
 def eval_page(request: Request):
     return templates.TemplateResponse(request, "eval.html", {"results": latest_eval_results()})

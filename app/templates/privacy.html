@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Privacy policy{% endblock %}
+{% macro contact_line() %}{% if contact %}<a href="mailto:{{ contact }}">{{ contact }}</a>{% else %}the contact address on our GitHub page{% endif %}{% endmacro %}
+{% block content %}
+<article class="card prose">
+  <h1>Privacy policy</h1>
+  <p class="updated">Last updated {{ updated }}</p>
+
+  <p>DeepDive is a research tool: you ask a question, and it searches the web and writes a report in which
+  every claim is checked against its source. This page explains what we store, why, and who else sees it.</p>
+
+  <h2>What we store</h2>
+  <ul>
+    <li><b>Your account</b>, from Google sign-in: your Google account id, email address, name and profile
+      picture link, plus when you joined and last signed in. We never see or store your Google password.</li>
+    <li><b>Your research</b>: the questions you ask and everything a run produces: sub-questions, search
+      queries, excerpts of the web pages it read, drafted claims, the verifier's verdicts and quotes, the
+      final report, and a step-by-step log of the run.</li>
+    <li><b>Server logs</b>: like most websites, our web server records requests (including IP address and
+      time) to keep the service running and secure.</li>
+  </ul>
+
+  <h2>Who can see your research</h2>
+  <p>Runs you start are private to your account. Other users can't open them. The example reports on the
+  home page are runs created by us, not by users.</p>
+
+  <h2>Services that process your data</h2>
+  <ul>
+    <li><b>Google</b>: handles sign-in.</li>
+    <li><b>Mesh API</b>: routes our calls to AI models (from providers such as OpenAI, Anthropic and Google).
+      Your question, the sub-questions and the source excerpts are sent through it to plan the research,
+      write and verify claims, and screen questions for harmful content.</li>
+    <li><b>Tavily</b>: receives the search queries made from your question and returns web results.</li>
+    <li><b>Amazon Web Services</b>: hosts the app and its database in the Sydney (Australia) region.</li>
+  </ul>
+  <p>We share data with these services only to provide DeepDive. We don't sell your data or use it for
+  advertising.</p>
+
+  <h2>Cookies</h2>
+  <p>We use one cookie, a signed session cookie that keeps you signed in. It is removed when you sign out.
+  We don't use analytics or advertising cookies.</p>
+
+  <h2>How long we keep it</h2>
+  <p>We keep your account and research while your account exists. To delete your account and all your runs,
+  email {{ contact_line() }} from the address you sign in with, and we'll delete them within 30 days.</p>
+
+  <h2>Your choices</h2>
+  <p>You can ask us for a copy of your data, to correct it, or to delete it, at {{ contact_line() }}. You can
+  also remove DeepDive's access in your Google account settings under "Third-party apps and services".</p>
+
+  <h2>Age</h2>
+  <p>DeepDive is intended for people aged 18 or over.</p>
+
+  <h2>Changes</h2>
+  <p>If we change this policy, we'll update the date at the top. Significant changes will be shown on the
+  site before they take effect.</p>
+</article>
+{% endblock %}

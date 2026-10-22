@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Terms of service{% endblock %}
+{% block content %}
+<article class="card prose">
+  <h1>Terms of service</h1>
+  <p class="updated">Last updated {{ updated }}</p>
+
+  <p>By signing in to or using DeepDive you agree to these terms. If you don't agree, please don't use it.</p>
+
+  <h2>The service</h2>
+  <p>DeepDive researches questions on the public web with AI models and writes reports from claims that
+  were checked against their cited sources. Checking reduces errors but doesn't remove them: a source can
+  itself be wrong or out of date, and the verifier can make mistakes. <b>Reports are for information only
+  and are not financial, investment, legal, medical or other professional advice.</b> Check important facts
+  against the cited sources before relying on them.</p>
+
+  <h2>Your account</h2>
+  <p>You sign in with a Google account and are responsible for activity under it. You must be 18 or older.</p>
+
+  <h2>Acceptable use</h2>
+  <p>Don't use DeepDive to research or produce anything illegal or harmful, to harass people, or to try to
+  break, overload or get around the limits of the service. Questions are screened automatically, and we may
+  refuse a question or suspend an account that breaks these rules.</p>
+
+  <h2>Free use and paid plans</h2>
+  <p>DeepDive may limit how many free research runs you can make, and those limits may change. Paid plans,
+  when offered, will show their price and terms before you buy.</p>
+
+  <h2>Your content</h2>
+  <p>Your questions and reports are yours. You give us permission to store and process them as described in
+  the <a href="/privacy">Privacy policy</a>, only to run the service for you. Reports quote and link to
+  third-party web pages, which belong to their owners.</p>
+
+  <h2>Availability and liability</h2>
+  <p>DeepDive is provided "as is", without warranties. We try to keep it available and accurate but can't
+  promise it will be uninterrupted or error-free. To the extent the law allows, we aren't liable for losses
+  arising from your use of the service or of its reports.</p>
+
+  <h2>Changes</h2>
+  <p>We may update these terms; the date at the top shows the latest version. Continuing to use DeepDive
+  after a change means you accept the updated terms.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about these terms: {% if contact %}<a href="mailto:{{ contact }}">{{ contact }}</a>{% else %}see the contact address on our GitHub page{% endif %}.</p>
+</article>
+{% endblock %}

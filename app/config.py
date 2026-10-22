@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     session_secret: str = ""  # empty = a random key per process (sign-ins end on restart)
     site_host: str = ""
+    contact_email: str = ""  # shown on the Privacy and Terms pages
 
     runs_per_hour: int = 10
     moderation_timeout_s: float = 10.0  # the safety screen must never stall run creation

@@ -249,3 +249,31 @@ def test_examples_command_marks_and_unmarks(deps, capsys):
     with factory() as s:
         assert not s.get(Run, run_id).is_example
     assert main(["add", "missing"], session_factory=factory) == 1
+
+
+# --- privacy and terms --------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path, heading", [("/privacy", "Privacy policy"), ("/terms", "Terms of service")]
+)
+def test_legal_pages_are_public(client, path, heading):
+    r = client.get(path)
+    assert r.status_code == 200 and heading in r.text
+
+
+def test_privacy_names_what_is_stored_and_who_processes_it(client):
+    html = client.get("/privacy").text
+    for fact in ["email", "Google", "Mesh", "Tavily", "Amazon Web Services", "cookie"]:
+        assert fact in html
+
+
+def test_legal_pages_show_contact_email_when_set(make_client):
+    client = make_client(contact_email="help@deepdive.example")
+    assert "help@deepdive.example" in client.get("/privacy").text
+    assert "help@deepdive.example" in client.get("/terms").text
+
+
+def test_every_page_links_privacy_and_terms(client):
+    html = client.get("/").text
+    assert 'href="/privacy"' in html and 'href="/terms"' in html

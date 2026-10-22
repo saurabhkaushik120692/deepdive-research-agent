@@ -52,7 +52,8 @@ h1 { font-size: 1.75rem; }
 h2 { font-size: 1.3rem; }
 h3 { font-size: 1.05rem; }
 a:hover { text-decoration: underline; }
-footer.container { color: var(--dd-faint); padding-bottom: 2rem; }
+footer.container { color: var(--dd-faint); padding-bottom: 2rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1.5rem; }
+.footer-links a { color: var(--dd-muted); }
 
 /* Header */
 .site-header { background: var(--dd-card); border-bottom: 1px solid var(--dd-line); }
@@ -283,3 +284,10 @@ a.cite { text-decoration: none; font-size: 0.75em; vertical-align: super; font-w
 .table-card table { margin: 0; font-size: 0.86rem; }
 .table-card th { font-weight: 600; color: var(--dd-muted); font-size: 0.8rem; }
 table.events code { white-space: pre-wrap; word-break: break-word; font-size: 0.75rem; }
+
+/* Privacy and terms */
+.prose { max-width: 46rem; margin-inline: auto; padding: 1.75rem 2rem; }
+.prose h1 { margin-bottom: 0.25rem; }
+.prose h2 { font-size: 1.1rem; margin-top: 1.75rem; }
+.prose li { margin-bottom: 0.3rem; }
+.prose .updated { color: var(--dd-muted); font-size: 0.88rem; }

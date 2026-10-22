@@ -158,8 +158,15 @@ and the live site.
      `/opt/deepdive/.env` (server) as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. The secret may
      be shown only once.
 4. **Audience**: while the app is in *Testing*, only the test users you add there can sign in
-   (add your own Google account). To let anyone sign in, click **Publish app**. The app only asks
-   for name, email and profile picture (`openid email profile`), which needs no Google review.
+   (add your own Google account).
+5. To let anyone sign in, first fill in **Branding → App domain**: home page `https://<SITE_HOST>`,
+   privacy policy `https://<SITE_HOST>/privacy`, terms `https://<SITE_HOST>/terms`, and the domain
+   under **Authorized domains**. Don't upload a logo (that triggers a manual brand review). Then
+   **Audience → Publish app**. The app only asks for name, email and profile picture
+   (`openid email profile`), which needs no Google review.
+
+Set `CONTACT_EMAIL` in the server `.env` too: the Privacy and Terms pages show it as the address
+for data and deletion requests.
 
 Also set `SESSION_SECRET` (a random string, see the `.env` template above): it signs the login
 cookie, so changing it signs everyone out. After editing the server's `.env`, restart the app:
