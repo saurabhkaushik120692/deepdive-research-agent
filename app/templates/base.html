@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
-  <link rel="stylesheet" href="/static/app.css?v=2">
-  <link rel="stylesheet" href="/static/print.css?v=2" media="print">
+  <link rel="stylesheet" href="/static/app.css?v=3">
+  <link rel="stylesheet" href="/static/print.css?v=3" media="print">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js"></script>
 </head>
 <body>
@@ -24,6 +24,16 @@
         <li><a href="/eval" {% if request.url.path == "/eval" %}aria-current="page"{% endif %}>Eval</a></li>
         <li><a href="/docs">API docs</a></li>
         <li><a href="https://github.com/saurabhkaushik120692/deepdive-research-agent" target="_blank" rel="noopener">GitHub</a></li>
+        {% set me = request.session.get("user") %}
+        {% if me %}
+          <li class="me">
+            {% if me.picture %}<img src="{{ me.picture }}" alt="" referrerpolicy="no-referrer">{% endif %}
+            <span>{{ me.name }}</span>
+            <form method="post" action="/auth/logout"><button type="submit" class="link">Sign out</button></form>
+          </li>
+        {% else %}
+          <li><a href="/auth/login?next={{ request.url.path }}" class="signin">Sign in</a></li>
+        {% endif %}
       </ul>
     </nav>
   </header>

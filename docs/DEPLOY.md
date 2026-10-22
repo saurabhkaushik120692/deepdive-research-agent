@@ -101,7 +101,9 @@ cd deepdive-research-agent && bash deploy/ec2-bootstrap.sh
 sudo tee /opt/deepdive/.env > /dev/null <<'EOF'
 MESH_API_KEY=rsk_...
 TAVILY_API_KEY=tvly-...
-DEMO_ACCESS_CODE=pick-a-code-for-judges
+GOOGLE_CLIENT_ID=...apps.googleusercontent.com   # step 9
+GOOGLE_CLIENT_SECRET=GOCSPX-...
+SESSION_SECRET=<python -c "import secrets; print(secrets.token_urlsafe(32))">
 SITE_HOST=13-201-5-7.nip.io
 RUNS_PER_HOUR=10
 # image location, so a manual `docker compose up -d` on the instance works too
@@ -136,8 +138,42 @@ green, then:
 curl -s https://13-201-5-7.nip.io/healthz     # {"status":"ok"}
 ```
 
-Open the site, enter the access code, run a question. Redeploy once more and check an earlier
+Open the site, sign in with Google, run a question. Redeploy once more and check an earlier
 run is still listed (the SQLite/Chroma data lives in `/opt/deepdive/data`, outside the container).
+
+## 9. Google sign-in (OAuth client)
+Starting a run needs a Google account. Create the OAuth client once; it serves both your laptop
+and the live site.
+
+1. <https://console.cloud.google.com> → project picker → **New project** → name `deepdive` → Create,
+   and select it.
+2. **APIs & Services → OAuth consent screen** (shown as **Google Auth Platform**) → **Get started**:
+   app name `DeepDive`, your email as support and contact email, audience **External** → Create.
+3. **Clients → Create client** → type **Web application**, name `DeepDive web`:
+   - Authorized JavaScript origins: `http://localhost:8000`, `http://localhost:8001`,
+     `https://<SITE_HOST>`
+   - Authorized redirect URIs: `http://localhost:8000/auth/callback`,
+     `http://localhost:8001/auth/callback`, `https://<SITE_HOST>/auth/callback`
+   - **Create**, then copy the client id and client secret straight into `.env` (local) and
+     `/opt/deepdive/.env` (server) as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. The secret may
+     be shown only once.
+4. **Audience**: while the app is in *Testing*, only the test users you add there can sign in
+   (add your own Google account). To let anyone sign in, click **Publish app**. The app only asks
+   for name, email and profile picture (`openid email profile`), which needs no Google review.
+
+Also set `SESSION_SECRET` (a random string, see the `.env` template above): it signs the login
+cookie, so changing it signs everyone out. After editing the server's `.env`, restart the app:
+`cd /opt/deepdive && sudo docker compose -f docker-compose.prod.yml up -d`.
+
+If Google rejects the `nip.io` address in step 3, the site needs a real domain name (a few dollars
+a year): point it at the Elastic IP, set `SITE_HOST` to it, and use it in step 3.
+
+**Example reports** (public, listed on the home page for signed-out visitors) are runs you mark:
+
+```bash
+sudo docker compose -f docker-compose.prod.yml exec app python -m app.examples list
+sudo docker compose -f docker-compose.prod.yml exec app python -m app.examples add <run_id>
+```
 
 ## Costs and cleanup
 On the free plan the eligible instance and ECR storage are covered by free-tier credits. An Elastic

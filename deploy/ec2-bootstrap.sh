@@ -28,6 +28,6 @@ sudo cp "$HERE/docker-compose.prod.yml" "$HERE/Caddyfile" /opt/deepdive/
 if [ ! -f /opt/deepdive/.env ]; then
   echo
   echo "!! Create /opt/deepdive/.env (chmod 600) with at least:"
-  echo "   MESH_API_KEY=...  TAVILY_API_KEY=...  DEMO_ACCESS_CODE=...  SITE_HOST=<eip-with-dashes>.nip.io"
+  echo "   MESH_API_KEY=...  TAVILY_API_KEY=...  GOOGLE_CLIENT_ID=...  GOOGLE_CLIENT_SECRET=...  SESSION_SECRET=...  SITE_HOST=<eip>.nip.io"
 fi
 echo "==> done"

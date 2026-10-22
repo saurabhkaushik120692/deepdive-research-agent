@@ -19,9 +19,21 @@ def _uuid() -> str:
     return uuid.uuid4().hex
 
 
+class User(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    google_sub: str = Field(index=True, unique=True)  # Google's stable account id
+    email: str
+    name: str = ""
+    picture: str = ""
+    created_at: datetime = Field(default_factory=_now)
+    last_login_at: datetime = Field(default_factory=_now)
+
+
 class Run(SQLModel, table=True):
     id: str = Field(default_factory=_uuid, primary_key=True)
     question: str
+    user_id: int | None = Field(default=None, foreign_key="user.id", index=True)  # None: eval/CLI
+    is_example: bool = False  # public example report, visible to everyone
     status: str = "queued"  # queued | running | completed | failed
     models: dict = Field(default_factory=dict, sa_column=Column(JSON))
     error: str | None = None

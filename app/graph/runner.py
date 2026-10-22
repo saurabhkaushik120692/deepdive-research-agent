@@ -12,9 +12,12 @@ from app.models import Event, Run
 MODEL_ROLES = ("planner", "drafter", "verifier", "synthesizer", "contradictions", "embed")
 
 
-def create_run(session: Session, question: str, settings: Settings) -> Run:
+def create_run(
+    session: Session, question: str, settings: Settings, user_id: int | None = None
+) -> Run:
     run = Run(
         question=question,
+        user_id=user_id,
         status="queued",
         models={role: getattr(settings, f"model_{role}") for role in MODEL_ROLES},
     )

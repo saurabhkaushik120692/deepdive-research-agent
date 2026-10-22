@@ -1,6 +1,7 @@
 import asyncio
 import json
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
@@ -8,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlmodel import func, select
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.guard import require_access
+from app.api.auth import can_view, require_user, session_user
 from app.deps import Deps
 from app.graph.runner import create_run, run_research
 from app.models import Claim, Event, Report, Run, SearchRecord, Source, SubQuestion, Verdict
@@ -26,9 +27,10 @@ def _deps(request: Request) -> Deps:
     return request.app.state.deps
 
 
-def _get_run_or_404(session, run_id: str) -> Run:
+def _get_run_or_404(session, run_id: str, request: Request) -> Run:
+    """The run, if this visitor may see it; other people's runs look like missing ones."""
     run = session.get(Run, run_id)
-    if run is None:
+    if run is None or not can_view(run, session_user(request)):
         raise HTTPException(status_code=404, detail="run not found")
     return run
 
@@ -44,8 +46,10 @@ async def _passes_safety_screen(deps: Deps, question: str) -> bool:
         return True
 
 
-@router.post("/runs", status_code=202, dependencies=[Depends(require_access)])
-async def start_run(body: RunRequest, request: Request) -> dict:
+@router.post("/runs", status_code=202)
+async def start_run(
+    body: RunRequest, request: Request, user: Annotated[dict, Depends(require_user)]
+) -> dict:
     deps = _deps(request)
     if not await _passes_safety_screen(deps, body.question):
         raise HTTPException(status_code=400, detail="question rejected by safety screen")
@@ -55,7 +59,7 @@ async def start_run(body: RunRequest, request: Request) -> dict:
         recent = session.exec(select(func.count()).where(Run.created_at >= cutoff)).one()
         if recent >= deps.settings.runs_per_hour:
             raise HTTPException(status_code=429, detail="hourly run limit reached, try later")
-        run_id = create_run(session, body.question, deps.settings).id
+        run_id = create_run(session, body.question, deps.settings, user_id=user["id"]).id
 
     async def _execute() -> None:
         async with request.app.state.run_slots:
@@ -70,7 +74,7 @@ async def start_run(body: RunRequest, request: Request) -> dict:
 @router.get("/runs/{run_id}")
 def get_run(run_id: str, request: Request) -> dict:
     with _deps(request).session_factory() as session:
-        run = _get_run_or_404(session, run_id)
+        run = _get_run_or_404(session, run_id, request)
         report = session.get(Report, run_id)
         return {
             "id": run.id,
@@ -85,7 +89,7 @@ def get_run(run_id: str, request: Request) -> dict:
 @router.get("/runs/{run_id}/trail")
 def get_trail(run_id: str, request: Request) -> dict:
     with _deps(request).session_factory() as session:
-        run = _get_run_or_404(session, run_id)
+        run = _get_run_or_404(session, run_id, request)
         sqs = session.exec(
             select(SubQuestion).where(SubQuestion.run_id == run_id).order_by(SubQuestion.id)
         ).all()
@@ -133,7 +137,7 @@ async def stream_events(run_id: str, request: Request):
     """SSE: replay the run's events (after Last-Event-ID), follow new ones, then send `done`."""
     deps = _deps(request)
     with deps.session_factory() as session:
-        _get_run_or_404(session, run_id)
+        _get_run_or_404(session, run_id, request)
     try:
         last_id = int(request.headers.get("last-event-id", "0"))
     except ValueError:

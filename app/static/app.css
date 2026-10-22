@@ -73,6 +73,16 @@ footer.container { color: var(--dd-faint); padding-bottom: 2rem; }
   .hero h1 { font-size: 1.5rem; }
 }
 
+/* Signed-in user in the header */
+.nav-links { align-items: center; }
+.me { display: flex; align-items: center; gap: 0.5rem; margin-left: 0.5rem; padding-left: 0.75rem !important; border-left: 1px solid var(--dd-line); font-size: 0.88rem; }
+.me img { width: 1.75rem; height: 1.75rem; border-radius: 50%; }
+.me form { margin: 0; }
+button.link { background: none; border: 0; padding: 0.35rem 0.5rem; margin: 0; color: var(--dd-muted); font-size: 0.88rem; width: auto; }
+button.link:hover { color: var(--dd-ink); text-decoration: underline; }
+a.signin { color: var(--dd-accent) !important; font-weight: 600; }
+@media (max-width: 600px) { .me span { display: none; } }
+
 /* Building blocks */
 .muted { color: var(--dd-muted); }
 .narrow { max-width: 28rem; margin-inline: auto; }
@@ -132,6 +142,13 @@ button.chip {
 button.chip:hover { background: var(--dd-accent-bg); border-color: var(--dd-accent); color: var(--dd-accent); }
 .ask-card button[type="submit"] { width: 100%; margin-bottom: 0; font-weight: 600; }
 .ask-card #ask-error:empty { display: none; }
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem; width: 100%; margin: 0;
+  background: var(--dd-card); color: var(--dd-ink); border: 1px solid #c9d1dd; font-weight: 600;
+}
+.google-btn:hover { background: var(--dd-soft); color: var(--dd-ink); text-decoration: none; }
+.signin-note { text-align: center; font-size: 0.8rem; color: var(--dd-muted); margin: 0.5rem 0 0; }
+.run-empty { padding: 0.8rem 0.9rem; margin: 0; color: var(--dd-muted); font-size: 0.9rem; }
 
 /* Home: recent runs */
 .run-list { margin-top: 1.5rem; }

@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from app.events import log_event
 from app.main import create_app
 from app.models import Run
+from tests.helpers import sign_in
 
 Q = "What is the EV battery market size in 2026?"
 
@@ -23,9 +24,16 @@ def make_client(deps, monkeypatch):
     monkeypatch.setattr("app.api.runs.run_research", _fake_run_research)
 
     def _make(**settings_overrides):
+        settings_overrides = {
+            "google_client_id": "cid",
+            "google_client_secret": "s",
+            **settings_overrides,
+        }
         for k, v in settings_overrides.items():
             setattr(deps.settings, k, v)
-        return TestClient(create_app(deps.settings, deps=deps))
+        client = TestClient(create_app(deps.settings, deps=deps))
+        client.user_id = sign_in(client)  # every test here acts as a signed-in user
+        return client
 
     return _make
 
@@ -36,18 +44,13 @@ def client(make_client):
 
 
 @pytest.fixture
-def client_with_code(make_client):
-    return make_client(demo_access_code="secret")
-
-
-@pytest.fixture
 def client_rate_1(make_client):
     return make_client(runs_per_hour=1)
 
 
-def _seed_run(deps, status, error=None, n_events=2):
+def _seed_run(deps, status, user_id, error=None, n_events=2):
     with deps.session_factory() as s:
-        run = Run(question=Q, status=status, error=error, models={})
+        run = Run(question=Q, status=status, error=error, models={}, user_id=user_id)
         s.add(run)
         s.commit()
         s.refresh(run)
@@ -58,8 +61,8 @@ def _seed_run(deps, status, error=None, n_events=2):
 
 
 @pytest.fixture
-def finished_run_with_events(deps):
-    return _seed_run(deps, "completed")[0]
+def finished_run_with_events(deps, client):
+    return _seed_run(deps, "completed", client.user_id)[0]
 
 
 @pytest.fixture
@@ -70,20 +73,8 @@ def first_event_id(deps, finished_run_with_events):
 
 
 @pytest.fixture
-def failed_run(deps):
-    return _seed_run(deps, "failed", error="RuntimeError: boom")[0]
-
-
-def test_gate_blocks_without_cookie(client_with_code):
-    assert client_with_code.post("/api/runs", json={"question": Q}).status_code == 401
-
-
-def test_access_sets_cookie_and_unlocks(client_with_code):
-    bad = client_with_code.post("/access", data={"code": "nope"}, follow_redirects=False)
-    assert bad.status_code == 401
-    ok = client_with_code.post("/access", data={"code": "secret"}, follow_redirects=False)
-    assert ok.status_code == 303 and "dd_access" in ok.cookies
-    assert client_with_code.post("/api/runs", json={"question": Q}).status_code == 202
+def failed_run(deps, client):
+    return _seed_run(deps, "failed", client.user_id, error="RuntimeError: boom")[0]
 
 
 def test_create_run_returns_202(client, deps):
@@ -144,24 +135,3 @@ def test_rate_limit_ignores_runs_older_than_an_hour(client_rate_1, deps):
         s.add(Run(question=Q, models={}, created_at=datetime.now(UTC) - timedelta(hours=2)))
         s.commit()
     assert client_rate_1.post("/api/runs", json={"question": Q}).status_code == 202
-
-
-def test_non_ascii_access_code_is_rejected_cleanly(client_with_code):
-    r = client_with_code.post("/access", data={"code": "pässwörd-ü"}, follow_redirects=False)
-    assert r.status_code == 401
-
-
-def test_access_cookie_is_secure_behind_https_proxy(client_with_code):
-    r = client_with_code.post(
-        "/access",
-        data={"code": "secret"},
-        headers={"X-Forwarded-Proto": "https"},
-        follow_redirects=False,
-    )
-    cookie = r.headers["set-cookie"].lower()
-    assert "secure" in cookie and "httponly" in cookie and "samesite=lax" in cookie
-
-
-def test_access_cookie_not_secure_on_plain_http_dev(client_with_code):
-    r = client_with_code.post("/access", data={"code": "secret"}, follow_redirects=False)
-    assert "secure" not in r.headers["set-cookie"].lower()

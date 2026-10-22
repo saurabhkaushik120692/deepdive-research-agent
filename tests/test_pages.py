@@ -7,6 +7,7 @@ from app.events import log_event
 from app.graph.schemas import Paragraph, Section, SynthesisOutput
 from app.main import create_app
 from app.models import Claim, EvidenceChunk, Report, Run, Source, SubQuestion, Verdict
+from tests.helpers import sign_in
 
 SUPPORTED_QUOTE = "global EV battery demand rose 28% to 1.1 TWh"
 REJECTED_REASON = "the $5T figure does not appear in the source"
@@ -15,9 +16,12 @@ REJECTED_REASON = "the $5T figure does not appear in the source"
 @pytest.fixture
 def make_client(deps):
     def _make(**overrides):
+        overrides = {"google_client_id": "cid", "google_client_secret": "s", **overrides}
         for k, v in overrides.items():
             setattr(deps.settings, k, v)
-        return TestClient(create_app(deps.settings, deps=deps))
+        client = TestClient(create_app(deps.settings, deps=deps))
+        client.user_id = sign_in(client)  # pages here are viewed by the run's owner
+        return client
 
     return _make
 
@@ -28,14 +32,11 @@ def client(make_client):
 
 
 @pytest.fixture
-def client_with_code(make_client):
-    return make_client(demo_access_code="secret")
-
-
-@pytest.fixture
-def seeded_run(deps):
+def seeded_run(deps, client):
     with deps.session_factory() as s:
-        run = Run(question="EV battery risks 2026?", status="completed", models={})
+        run = Run(
+            question="EV battery risks 2026?", status="completed", models={}, user_id=client.user_id
+        )
         s.add(run)
         s.commit()
         s.refresh(run)
@@ -95,16 +96,6 @@ def seeded_run(deps):
 
 def test_ask_page(client):
     assert 'name="question"' in client.get("/").text
-
-
-def test_gate_page_when_code_set(client_with_code):
-    html = client_with_code.get("/").text
-    assert 'name="code"' in html and 'name="question"' not in html
-
-
-def test_pages_gated_without_cookie(client_with_code, seeded_run):
-    r = client_with_code.get(f"/runs/{seeded_run.id}/report", follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/"
 
 
 def test_report_shows_quote_on_hover_and_rejected(client, seeded_run):

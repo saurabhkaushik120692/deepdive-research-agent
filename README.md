@@ -19,7 +19,7 @@ often doesn't say what the sentence claims. DeepDive's focus is making the citat
 | Verifier quotes found verbatim in the source | **99.3%** | 99.5% |
 | Cost / time per research run | **$0.04** / ~4 min | $0.04 / ~4 min |
 
-**Live demo:** https://16.178.82.245.nip.io (access code in the submission notes).
+**Live demo:** https://16.178.82.245.nip.io (sign in with Google to start a run; example reports are public).
 
 ## How the agents cooperate
 
@@ -131,6 +131,9 @@ uv run uvicorn app.main:create_app --factory --reload   # http://localhost:8000
 ```
 
 - One question from the terminal: `uv run python -m app.cli "your question"`
+- Sign-in: set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `SESSION_SECRET` (see
+  [`docs/DEPLOY.md`](docs/DEPLOY.md#9-google-sign-in-oauth-client)). Mark a run as a public example
+  report: `uv run python -m app.examples add <run_id>`
 - Docker: `docker compose up --build` (data persists in `./data`)
 - Tests (no network, no keys): `uv run pytest -q`
 - API docs: `/docs` · Live timeline: `/runs/<id>` · Audit trail: `/runs/<id>/trail` (JSON at
@@ -141,8 +144,8 @@ uv run uvicorn app.main:create_app --factory --reload   # http://localhost:8000
 GitHub Actions → ECR → EC2 (deploy through SSM, no SSH), with Caddy for HTTPS. GitHub
 authenticates with an OIDC role when available; on the AWS free plan (no IAM identity providers)
 it falls back to a deploy-only IAM user whose key can only push to this repository and send
-commands to this one instance. The public demo is protected by an access code and an hourly run
-limit. Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+commands to this one instance. Starting a run needs Google sign-in, each user sees only their own runs (plus public example
+reports), and an hourly run limit caps cost. Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Project layout
 
@@ -150,7 +153,7 @@ limit. Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 app/graph/       LangGraph coordinator, agent nodes, loop rules, runner
 app/tools/       quote matching, source tiers, chunking, search, fetch, vector store
 app/llm.py       the only place that calls models, always through Mesh API
-app/api/         REST + SSE API, HTML pages, access gate
+app/api/         REST + SSE API, HTML pages, Google sign-in
 eval/            question set, planted-error generator, judge, metrics, results
 docs/            design spec, implementation plan, design notes, deploy runbook
 ```

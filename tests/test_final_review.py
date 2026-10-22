@@ -14,7 +14,7 @@ from app.graph.runner import create_run, run_research
 from app.llm import LlmOutputError, MeshLlm
 from app.main import create_app
 from tests.fakes import FakeOpenAI
-from tests.helpers import claims_of, event_types, events, get_run, report_of
+from tests.helpers import claims_of, event_types, events, get_run, report_of, sign_in
 from tests.scripts import script_happy_path
 
 _REQ = httpx.Request("POST", "https://api.meshapi.ai/v1/chat/completions")
@@ -97,7 +97,9 @@ def test_slow_moderation_does_not_block_run_creation(deps, monkeypatch):
     monkeypatch.setattr("app.api.runs.run_research", _noop_research)
     deps.settings.moderation_timeout_s = 0.2
     deps.llm.moderate = slow_moderate
+    deps.settings.google_client_id, deps.settings.google_client_secret = "cid", "s"
     client = TestClient(create_app(deps.settings, deps=deps))
+    sign_in(client)
     started = time.perf_counter()
     r = client.post("/api/runs", json={"question": "What is the EV battery market size in 2026?"})
     assert r.status_code == 202 and time.perf_counter() - started < 2

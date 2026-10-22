@@ -47,7 +47,13 @@ class Settings(BaseSettings):
     llm_concurrency: int = 8
     llm_timeout_s: float = 180.0  # reasoning models (gpt-5-nano) often need 60-120 s per call
 
-    demo_access_code: str = ""  # empty = no access gate
+    # Google sign-in. site_host is the public hostname (the deploy sets it for Caddy too):
+    # when set, sign-in returns to https://<site_host>/ and the session cookie is HTTPS-only.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    session_secret: str = ""  # empty = a random key per process (sign-ins end on restart)
+    site_host: str = ""
+
     runs_per_hour: int = 10
     moderation_timeout_s: float = 10.0  # the safety screen must never stall run creation
     max_concurrent_runs: int = 2

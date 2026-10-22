@@ -86,7 +86,9 @@ def test_completed_run_page_shows_report_and_collapsed_timeline(client, seeded_r
 
 def test_running_run_page_has_open_live_view_and_no_report(client, deps):  # noqa: F811
     with deps.session_factory() as s:
-        run = Run(question="Still researching?", status="running", models={})
+        run = Run(
+            question="Still researching?", status="running", models={}, user_id=client.user_id
+        )
         s.add(run)
         s.commit()
         s.refresh(run)

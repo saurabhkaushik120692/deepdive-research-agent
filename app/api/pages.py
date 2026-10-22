@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
-from app.api.guard import has_access
+from app.api.auth import can_view, session_user
 from app.deps import Deps
 from app.graph.schemas import Conflict, SynthesisOutput
 from app.models import (
@@ -80,36 +80,57 @@ def _deps(request: Request) -> Deps:
     return request.app.state.deps
 
 
-def _gate(request: Request) -> RedirectResponse | None:
-    return None if has_access(request) else RedirectResponse("/", status_code=303)
+class SignInRequired(Exception):
+    """A signed-out visitor asked for a run that isn't public: send them to sign in."""
 
 
-def _run_or_404(session, run_id: str) -> Run:
+def _visible_run(session, run_id: str, request: Request) -> Run:
     run = session.get(Run, run_id)
-    if run is None:
-        raise HTTPException(status_code=404, detail="run not found")
-    return run
+    user = session_user(request)
+    if run is not None and can_view(run, user):
+        return run
+    if user is None:
+        raise SignInRequired()
+    raise HTTPException(status_code=404, detail="run not found")
+
+
+def sign_in_redirect(request: Request, exc: SignInRequired) -> RedirectResponse:
+    return RedirectResponse(f"/auth/login?next={request.url.path}", status_code=303)
 
 
 @router.get("/", response_class=HTMLResponse)
 def ask(request: Request):
-    if not has_access(request):
-        return templates.TemplateResponse(request, "gate.html", {})
+    user = session_user(request)
     with _deps(request).session_factory() as session:
-        recent = session.exec(select(Run).order_by(Run.created_at.desc()).limit(8)).all()
+        examples = session.exec(
+            select(Run).where(Run.is_example).order_by(Run.created_at.desc()).limit(6)
+        ).all()
+        mine = []
+        if user is not None:
+            mine = session.exec(
+                select(Run)
+                .where(Run.user_id == user["id"])
+                .order_by(Run.created_at.desc())
+                .limit(8)
+            ).all()
     return templates.TemplateResponse(
         request,
         "ask.html",
-        {"recent": recent, "examples": EXAMPLES, "results": latest_eval_results()},
+        {
+            "user": user,
+            "mine": mine,
+            "example_runs": examples,
+            "examples": EXAMPLES,
+            "results": latest_eval_results(),
+            "signin_failed": request.query_params.get("signin") == "failed",
+        },
     )
 
 
 @router.get("/runs/{run_id}", response_class=HTMLResponse)
 def run_page(run_id: str, request: Request):
-    if redirect := _gate(request):
-        return redirect
     with _deps(request).session_factory() as session:
-        run = _run_or_404(session, run_id)
+        run = _visible_run(session, run_id, request)
         view = _report_view(session, run) if run.status == "completed" else None
     return templates.TemplateResponse(
         request, "run.html", {"run": run, "view": view, "duration": duration(run)}
@@ -199,10 +220,8 @@ def _report_view(session, run: Run) -> dict | None:
 
 @router.get("/runs/{run_id}/report", response_class=HTMLResponse)
 def report_page(run_id: str, request: Request, fragment: bool = False):
-    if redirect := _gate(request):
-        return redirect
     with _deps(request).session_factory() as session:
-        run = _run_or_404(session, run_id)
+        run = _visible_run(session, run_id, request)
         view = _report_view(session, run)
     template = "_report_body.html" if fragment else "report.html"
     return templates.TemplateResponse(request, template, {"run": run, "view": view})
@@ -210,10 +229,8 @@ def report_page(run_id: str, request: Request, fragment: bool = False):
 
 @router.get("/runs/{run_id}/trail", response_class=HTMLResponse)
 def trail_page(run_id: str, request: Request):
-    if redirect := _gate(request):
-        return redirect
     with _deps(request).session_factory() as session:
-        run = _run_or_404(session, run_id)
+        run = _visible_run(session, run_id, request)
         sqs = session.exec(
             select(SubQuestion).where(SubQuestion.run_id == run_id).order_by(SubQuestion.id)
         ).all()

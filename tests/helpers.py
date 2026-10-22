@@ -65,3 +65,34 @@ def state(run, pending=None, round_=0):
         "pending_sq_ids": pending or [],
         "researched": [],
     }
+
+
+class FakeGoogle:
+    """Stands in for Authlib's Google client: no network, scripted user info."""
+
+    def __init__(self, userinfo=None, error=None):
+        self.userinfo, self.error, self.redirect_uris = userinfo, error, []
+
+    async def authorize_redirect(self, request, redirect_uri):
+        from fastapi.responses import RedirectResponse
+
+        self.redirect_uris.append(redirect_uri)
+        return RedirectResponse("https://accounts.google.com/o/oauth2/auth?fake=1", 302)
+
+    async def authorize_access_token(self, request):
+        if self.error:
+            raise self.error
+        return {"userinfo": self.userinfo}
+
+
+def sign_in(client, sub="google-owner", email="owner@example.com", name="Owner", verified=True):
+    """Sign the test client in through /auth/callback; returns the user's id."""
+    from app.models import User
+
+    client.app.state.google = FakeGoogle(
+        {"sub": sub, "email": email, "email_verified": verified, "name": name, "picture": ""}
+    )
+    r = client.get("/auth/callback", follow_redirects=False)
+    assert r.status_code == 303, r.text
+    with client.app.state.deps.session_factory() as s:
+        return s.exec(select(User).where(User.google_sub == sub)).one().id
