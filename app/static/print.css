@@ -1,10 +1,20 @@
-/* "Save as PDF": print only the report, with citation URLs written out. */
+/* "Save as PDF": print only the report, black on white, with citation URLs written out. */
+:root[data-theme="dark"] {
+  --dd-ink: #111; --dd-muted: #444; --dd-faint: #666; --dd-line: #ccc; --dd-line-strong: #bbb;
+  --dd-page: #fff; --dd-card: #fff; --dd-solid: #fff; --dd-soft: #f3f3f3;
+  --dd-accent: #1d4ed8; --dd-accent-bg: #eef2ff; --dd-teal: #1d4ed8;
+  --dd-good: #166534; --dd-good-bg: #e8f5ec; --dd-warn: #92400e; --dd-warn-bg: #fdf3e2;
+  --dd-bad: #b91c1c; --dd-bad-bg: #fdecea;
+  --pico-background-color: #fff; --pico-color: #111; --pico-muted-color: #444;
+  --pico-h1-color: #000; --pico-h2-color: #000; --pico-h3-color: #000;
+}
 .site-header, footer, .no-print, nav, button, [role="button"], .run-head, .cite-pop { display: none !important; }
+body { background: #fff; color: #111; font-size: 11pt; }
 .report-layout { display: block; }
-.report { border: 0; padding: 0; }
-.report .summary { background: none; padding: 0; }
+.report { background: none; color: #111; border: 0; padding: 0; backdrop-filter: none; }
+.report .summary { background: none; border: 0; padding: 0; }
+.callout.warn { color: #6b4108; }
 .print-only { display: block !important; }
-body { font-size: 11pt; }
 main.container { max-width: none; padding: 0; }
 a { color: inherit; text-decoration: none; }
 a.cite::after { content: " <" attr(href) ">"; font-size: 0.75em; word-break: break-all; }

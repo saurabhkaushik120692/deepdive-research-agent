@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlmodel import select
+from sqlmodel import func, select
 
 from app.api.auth import admin_user, can_view, session_user
 from app.api.quota import quota_for, start_refusal
@@ -116,6 +116,8 @@ def ask(request: Request):
                 .limit(8)
             ).all()
             quota = quota_for(session, user["id"], _deps(request).settings)
+        done = [r for r in examples if r.status == "completed"]
+        samples = _verdict_samples(session, done[0].id) if done else []
     return templates.TemplateResponse(
         request,
         "ask.html",
@@ -124,12 +126,31 @@ def ask(request: Request):
             "mine": mine,
             "quota": quota,
             "refusal": quota and start_refusal(quota, _deps(request).settings),
+            "samples": samples,
             "example_runs": examples,
             "examples": EXAMPLES,
             "results": latest_eval_results(),
             "signin_failed": request.query_params.get("signin") == "failed",
         },
     )
+
+
+def _verdict_samples(session, run_id: str) -> list[dict]:
+    """One supported and one rejected claim from a report, shortest first, for the home page."""
+    samples = []
+    for label in ("supported", "unsupported"):
+        row = session.exec(
+            select(Claim, Verdict)
+            .join(Verdict, Verdict.claim_id == Claim.id)
+            .where(Claim.run_id == run_id, Verdict.label == label)
+            .order_by(func.length(Claim.text))
+        ).first()
+        if row:
+            claim, verdict = row
+            samples.append(
+                {"run_id": run_id, "label": label, "text": claim.text, "reason": verdict.reason}
+            )
+    return samples
 
 
 @router.get("/runs/{run_id}", response_class=HTMLResponse)

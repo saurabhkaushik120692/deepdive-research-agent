@@ -1,4 +1,4 @@
-"""The three-column UI: home page numbers, run page with report, quote popovers, live feed."""
+"""The UI: home page numbers and verdicts, run page with report, quote popovers, live feed."""
 
 import json
 from datetime import UTC, datetime, timedelta
@@ -118,3 +118,25 @@ def test_event_stream_adds_claim_text_to_verdicts(client, deps, seeded_run):  # 
         text = claim.text
     body = client.get(f"/api/runs/{seeded_run.id}/events").text
     assert json.dumps(text)[1:-1] in body
+
+
+def test_home_shows_real_verdicts_from_the_latest_example(client, deps, seeded_run):  # noqa: F811
+    with deps.session_factory() as s:
+        run = s.get(Run, seeded_run.id)
+        run.is_example = True
+        s.add(run)
+        s.commit()
+    html = client.get("/").text
+    assert "Real verdicts from an example report" in html
+    assert "Demand rose 28%." in html and "$5T." in html  # one supported, one rejected
+    assert "Prices fell." not in html  # partial verdicts aren't shown
+    assert f'href="/runs/{seeded_run.id}">Open the report' in html
+
+
+def test_home_has_no_verdict_card_without_examples(client, seeded_run):  # noqa: F811
+    assert "Real verdicts" not in client.get("/").text
+
+
+def test_only_the_home_page_gets_the_moving_aurora(client, seeded_run):  # noqa: F811
+    assert '<body class="home">' in client.get("/").text
+    assert '<body class="">' in client.get(f"/runs/{seeded_run.id}").text

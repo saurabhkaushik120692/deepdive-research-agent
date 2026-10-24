@@ -1,99 +1,124 @@
 {% extends "base.html" %}
 {% block title %}Ask{% endblock %}
+{% block body_class %}home{% endblock %}
 {% macro pct(x) %}{{ "n/a" if x is none else "%.1f%%" | format(x * 100) }}{% endmacro %}
 {% block content %}
-<div class="three-col">
-  <aside>
-    <p class="eyebrow">How it works</p>
-    <ol class="steps">
-      <li><span class="num">1</span><span><b>Plan</b><small>Split the question into 3-6 sub-questions</small></span></li>
-      <li><span class="num">2</span><span><b>Research in parallel</b><small>Search, read and store evidence per sub-question</small></span></li>
-      <li><span class="num">3</span><span><b>Draft claims</b><small>One fact per claim, each citing its evidence</small></span></li>
-      <li><span class="num">4</span><span><b>Verify</b><small>A different model checks each claim against only the text it cites</small></span></li>
-      <li><span class="num">5</span><span><b>Loop if thin</b><small>Weak areas get a better query and another round</small></span></li>
-      <li><span class="num">6</span><span><b>Report</b><small>Written from verified claims only; rejections listed</small></span></li>
-    </ol>
-  </aside>
+{% set p = results.verifier_probe if results else none %}
+<section class="hero">
+  {% if p %}<span class="glow-badge"><i></i>{{ pct(p.catch_rate) }} of planted false claims caught</span>{% endif %}
+  <h1>Research you can <span class="grad">actually verify</span></h1>
+  <p>Every sentence is checked against the exact source text it cites, before you see it.</p>
+</section>
 
-  <section class="col-main">
-    <div class="hero">
-      <h1>Ask a research question</h1>
-      <p>Get a cited report in which every claim has been checked against the exact source text it cites.</p>
-    </div>
-
-    <form id="ask-form" class="card ask-card">
-      <textarea id="question" name="question" rows="3" minlength="10" maxlength="500" required
-        placeholder="What are the main risks of investing in the EV battery market in 2026?"></textarea>
+<div class="ask-glow">
+  <form id="ask-form" class="ask-card">
+    <textarea id="question" name="question" rows="2" minlength="10" maxlength="500" required aria-label="Your research question"
+      placeholder="What are the main risks of investing in the EV battery market in 2026?"></textarea>
+    <div class="ask-row">
       <div class="chips">
         <span>Try:</span>
         {% for label, q in examples %}
           <button type="button" class="chip" data-example="{{ q }}">{{ label }}</button>
         {% endfor %}
       </div>
-      <small id="ask-error" class="error" role="alert">{% if signin_failed %}Google sign-in didn't complete. Try again.{% endif %}</small>
       {% if user and refusal %}
-        <button type="submit" id="ask-btn" disabled>Start research</button>
-        <p class="quota-note used-up">{{ refusal }}</p>
+        <button type="submit" id="ask-btn" disabled>Start research &rarr;</button>
       {% elif user %}
-        <button type="submit" id="ask-btn">Start research</button>
-        {% if quota.left is not none %}<p class="quota-note">{{ quota.left }} of {{ quota.limit }} free reports left</p>{% endif %}
+        <button type="submit" id="ask-btn">Start research &rarr;</button>
       {% else %}
         <a href="/auth/login?next=/" role="button" id="google-btn" class="google-btn">
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
-          Continue with Google to start research
+          Continue with Google
         </a>
-        <p class="signin-note">Free to try. Sign-in keeps your reports private to you.<br>By continuing you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy policy</a>.</p>
       {% endif %}
-    </form>
-
-    {% macro run_rows(runs) %}
-      {% for r in runs %}
-        <a class="run-row" href="/runs/{{ r.id }}">
-          <span class="q">{{ r.question }}</span>
-          <span class="meta">
-            <span class="pill status-{{ r.status }}">{{ {"completed": "done"}.get(r.status, r.status) }}</span>
-            <span>{{ r.created_at | ago }}</span>
-          </span>
-        </a>
-      {% endfor %}
-    {% endmacro %}
-
-    {% if user %}
-    <div class="run-list">
-      <p class="eyebrow">Your runs</p>
-      <div class="card">
-        {% if mine %}{{ run_rows(mine) }}{% else %}<p class="run-empty">Your reports will appear here. Start with a question above.</p>{% endif %}
-      </div>
     </div>
+    <small id="ask-error" class="error" role="alert">{% if signin_failed %}Google sign-in didn't complete. Try again.{% endif %}</small>
+    {% if user and refusal %}
+      <p class="quota-note used-up">{{ refusal }}</p>
+    {% elif user and quota.left is not none %}
+      <p class="quota-note">{{ quota.left }} of {{ quota.limit }} free reports left</p>
+    {% elif not user %}
+      <p class="signin-note">Free to try. Sign-in keeps your reports private to you. By continuing you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy policy</a>.</p>
     {% endif %}
-
-    {% if example_runs %}
-    <div class="run-list">
-      <p class="eyebrow">Example reports</p>
-      <div class="card">{{ run_rows(example_runs) }}</div>
-    </div>
-    {% endif %}
-  </section>
-
-  <aside>
-    <p class="eyebrow">Measured on {{ results.n_questions if results else 24 }} questions</p>
-    {% if results %}
-      {% set p = results.verifier_probe %}
-      {% set j = results.independent_judge %}
-      {% set g = results.gold %}
-      <div class="stat good"><strong>{{ pct(p.catch_rate) }}</strong><span>planted false claims caught</span><small>of {{ p.n_mutants }}, by the verifier</small></div>
-      <div class="stat good"><strong>{{ pct(p.wrongful_rejection_rate) }}</strong><span>true claims wrongly rejected</span><small>of {{ p.n_originals }} re-checked</small></div>
-      <div class="stat"><strong>{{ pct(j.groundedness) }}</strong><span>report claims grounded</span><small>per an independent judge model</small></div>
-      <div class="stat"><strong>{{ pct(g.accuracy) }}</strong><span>agreement with hand labels</span><small>{{ g.n_labelled }} claims labelled by hand</small></div>
-      {% if results.cost and results.latency_s %}
-        <p class="side-note">About ${{ "%.2f" | format(results.cost.per_run_usd.mean) }} and {{ (results.latency_s.p50 / 60) | round | int }} min per research run.</p>
-      {% endif %}
-    {% else %}
-      <p class="side-note">No eval results yet.</p>
-    {% endif %}
-    <a href="/eval" class="side-note">See the full eval &rarr;</a>
-  </aside>
+  </form>
 </div>
+
+<section class="how" aria-labelledby="how-title">
+  <p class="eyebrow" id="how-title">How it works</p>
+  <ol class="pipeline">
+    <li class="pulse" aria-hidden="true"></li>
+    <li><b>1</b><strong>Plan</strong>Split into 3-6 sub-questions</li>
+    <li><b>2</b><strong>Research</strong>Search and read, in parallel</li>
+    <li><b>3</b><strong>Draft</strong>One fact per claim, each cited</li>
+    <li class="hot"><b>&check;</b><strong>Verify</strong>A different model checks the quote</li>
+    <li><b>&#8635;</b><strong>Loop</strong>Thin areas get researched again</li>
+    <li><b>&para;</b><strong>Report</strong>Verified claims only</li>
+  </ol>
+</section>
+
+<section class="bento" aria-label="Measured results">
+  {% if samples %}
+    <div class="glass verdicts">
+      <p class="eyebrow">Real verdicts from an example report</p>
+      {% for s in samples %}
+        <div class="verdict-line {{ 'ok' if s.label == 'supported' else 'no' }}">
+          <i aria-hidden="true">{{ "✓" if s.label == "supported" else "✕" }}</i>
+          <div><span class="t">{{ s.text }}</span><small>{{ "Supported: " if s.label == "supported" else "Rejected: " }}{{ s.reason }}</small></div>
+        </div>
+      {% endfor %}
+      <a href="/runs/{{ samples[0].run_id }}">Open the report &rarr;</a>
+    </div>
+  {% endif %}
+  {% if results %}
+    {% set j = results.independent_judge %}
+    {% set g = results.gold %}
+    <div class="stat good"><strong>{{ pct(p.catch_rate) }}</strong><span>planted false claims caught</span><small>of {{ p.n_mutants }}, by the verifier</small></div>
+    <div class="stat good"><strong>{{ pct(p.wrongful_rejection_rate) }}</strong><span>true claims wrongly rejected</span><small>of {{ p.n_originals }} re-checked</small></div>
+    <div class="stat"><strong>{{ pct(j.groundedness) }}</strong><span>report claims grounded</span><small>per an independent judge model</small></div>
+    <div class="stat"><strong>{{ pct(g.accuracy) }}</strong><span>agreement with hand labels</span><small>{{ g.n_labelled }} claims labelled by hand</small></div>
+  {% endif %}
+</section>
+<div class="bento-end">
+  {% if results and results.cost and results.latency_s %}
+    <span class="side-note">Measured on {{ results.n_questions }} questions · about ${{ "%.2f" | format(results.cost.per_run_usd.mean) }} and {{ (results.latency_s.p50 / 60) | round | int }} min per research run</span>
+  {% elif not results %}
+    <span class="side-note">No eval results yet.</span>
+  {% else %}
+    <span></span>
+  {% endif %}
+  <a href="/eval" class="side-note">See the full eval &rarr;</a>
+</div>
+
+{% macro run_rows(runs) %}
+  {% for r in runs %}
+    <a class="run-row" href="/runs/{{ r.id }}">
+      <span class="q">{{ r.question }}</span>
+      <span class="meta">
+        <span class="pill status-{{ r.status }}">{{ {"completed": "done"}.get(r.status, r.status) }}</span>
+        <span>{{ r.created_at | ago }}</span>
+      </span>
+    </a>
+  {% endfor %}
+{% endmacro %}
+
+{% if user or example_runs %}
+<div class="lists">
+  {% if user %}
+  <div class="run-list">
+    <p class="eyebrow">Your runs</p>
+    <div class="card">
+      {% if mine %}{{ run_rows(mine) }}{% else %}<p class="run-empty">Your reports will appear here. Start with a question above.</p>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% if example_runs %}
+  <div class="run-list">
+    <p class="eyebrow">Example reports</p>
+    <div class="card">{{ run_rows(example_runs) }}</div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
 
 <script>
 const questionBox = document.getElementById("question");
