@@ -27,6 +27,8 @@ class User(SQLModel, table=True):
     picture: str = ""
     created_at: datetime = Field(default_factory=_now)
     last_login_at: datetime = Field(default_factory=_now)
+    blocked: bool = False  # can sign in and read old reports, can't start new ones
+    quota_reset_at: datetime | None = None  # free reports count from here (admin reset)
 
 
 class Run(SQLModel, table=True):

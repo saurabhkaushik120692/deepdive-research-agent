@@ -132,8 +132,9 @@ uv run uvicorn app.main:create_app --factory --reload   # http://localhost:8000
 
 - One question from the terminal: `uv run python -m app.cli "your question"`
 - Sign-in: set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `SESSION_SECRET` (see
-  [`docs/DEPLOY.md`](docs/DEPLOY.md#9-google-sign-in-oauth-client)). Mark a run as a public example
-  report: `uv run python -m app.examples add <run_id>`
+  [`docs/DEPLOY.md`](docs/DEPLOY.md#9-google-sign-in-oauth-client)). Signing in with the
+  `CONTACT_EMAIL` account opens the admin area at `/admin`. Mark a run as a public example report
+  there or with `uv run python -m app.examples add <run_id>`
 - Docker: `docker compose up --build` (data persists in `./data`)
 - Tests (no network, no keys): `uv run pytest -q`
 - API docs: `/docs` · Live timeline: `/runs/<id>` · Audit trail: `/runs/<id>/trail` (JSON at

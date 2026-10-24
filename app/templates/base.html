@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
-  <link rel="stylesheet" href="/static/app.css?v=5">
-  <link rel="stylesheet" href="/static/print.css?v=5" media="print">
+  <link rel="stylesheet" href="/static/app.css?v=6">
+  <link rel="stylesheet" href="/static/print.css?v=6" media="print">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js"></script>
 </head>
 <body>
@@ -25,6 +25,9 @@
         <li><a href="/docs">API docs</a></li>
         <li><a href="https://github.com/saurabhkaushik120692/deepdive-research-agent" target="_blank" rel="noopener">GitHub</a></li>
         {% set me = request.session.get("user") %}
+        {% if me and is_admin(request) %}
+          <li><a href="/admin" {% if request.url.path == "/admin" %}aria-current="page"{% endif %}>Admin</a></li>
+        {% endif %}
         {% if me %}
           <li class="me">
             {% if me.picture %}<img src="{{ me.picture }}" alt="" referrerpolicy="no-referrer">{% endif %}

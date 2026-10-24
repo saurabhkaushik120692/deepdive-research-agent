@@ -31,9 +31,9 @@
         {% endfor %}
       </div>
       <small id="ask-error" class="error" role="alert">{% if signin_failed %}Google sign-in didn't complete. Try again.{% endif %}</small>
-      {% if user and quota.exhausted %}
+      {% if user and refusal %}
         <button type="submit" id="ask-btn" disabled>Start research</button>
-        <p class="quota-note used-up">{{ limit_message }}</p>
+        <p class="quota-note used-up">{{ refusal }}</p>
       {% elif user %}
         <button type="submit" id="ask-btn">Start research</button>
         {% if quota.left is not none %}<p class="quota-note">{{ quota.left }} of {{ quota.limit }} free reports left</p>{% endif %}

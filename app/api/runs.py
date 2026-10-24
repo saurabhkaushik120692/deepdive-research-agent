@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 from sqlmodel import func, select
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.auth import can_view, require_user, session_user
-from app.api.quota import limit_message, quota_for
+from app.api.auth import admin_user, can_view, require_user, session_user
+from app.api.quota import quota_for, start_refusal
 from app.deps import Deps
 from app.graph.runner import create_run, run_research
 from app.models import Claim, Event, Report, Run, SearchRecord, Source, SubQuestion, Verdict
@@ -31,7 +31,9 @@ def _deps(request: Request) -> Deps:
 def _get_run_or_404(session, run_id: str, request: Request) -> Run:
     """The run, if this visitor may see it; other people's runs look like missing ones."""
     run = session.get(Run, run_id)
-    if run is None or not can_view(run, session_user(request)):
+    if run is None or not can_view(
+        run, session_user(request), admin=admin_user(request) is not None
+    ):
         raise HTTPException(status_code=404, detail="run not found")
     return run
 
@@ -57,8 +59,9 @@ async def start_run(
 
     cutoff = datetime.now(UTC) - timedelta(hours=1)
     with deps.session_factory() as session:
-        if quota_for(session, user["id"], deps.settings).exhausted:
-            raise HTTPException(status_code=403, detail=limit_message(deps.settings))
+        refusal = start_refusal(quota_for(session, user["id"], deps.settings), deps.settings)
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
         recent = session.exec(select(func.count()).where(Run.created_at >= cutoff)).one()
         if recent >= deps.settings.runs_per_hour:
             raise HTTPException(status_code=429, detail="hourly run limit reached, try later")

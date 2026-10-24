@@ -55,11 +55,28 @@ def require_user(request: Request) -> dict:
     return user
 
 
-def can_view(run: Run, user: dict | None) -> bool:
-    return run.is_example or (user is not None and run.user_id == user["id"])
+def is_admin_email(settings: Settings, email: str) -> bool:
+    """The admin is whoever signs in with CONTACT_EMAIL; with it unset there is no admin."""
+    admin = settings.contact_email.strip().lower()
+    return bool(admin) and email.strip().lower() == admin
 
 
-def _safe_next(path: str | None) -> str:
+def admin_user(request: Request) -> User | None:
+    """The signed-in user if they are the admin, else None. Checked against the database."""
+    user = session_user(request)
+    if user is None:
+        return None
+    deps: Deps = request.app.state.deps
+    with deps.session_factory() as session:
+        row = session.get(User, user["id"])
+    return row if row is not None and is_admin_email(deps.settings, row.email) else None
+
+
+def can_view(run: Run, user: dict | None, admin: bool = False) -> bool:
+    return admin or run.is_example or (user is not None and run.user_id == user["id"])
+
+
+def safe_next(path: str | None) -> str:
     """Only same-site paths: '/runs/x' yes; '//evil', 'https://evil', '/\\evil' no."""
     if not path or not path.startswith("/") or path.startswith("//") or "\\" in path:
         return "/"
@@ -81,7 +98,7 @@ async def login(request: Request, next: str | None = None):
             "(set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET).",
             status_code=503,
         )
-    request.session["next"] = _safe_next(next)
+    request.session["next"] = safe_next(next)
     return await google.authorize_redirect(
         request, _callback_url(request, request.app.state.settings)
     )
@@ -89,7 +106,7 @@ async def login(request: Request, next: str | None = None):
 
 @router.get("/callback", name="auth_callback")
 async def callback(request: Request):
-    next_path = _safe_next(request.session.pop("next", None))
+    next_path = safe_next(request.session.pop("next", None))
     try:
         token = await request.app.state.google.authorize_access_token(request)
     except (OAuthError, AttributeError) as e:

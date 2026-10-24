@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.api import auth, pages, runs
+from app.api import admin, auth, pages, runs
 from app.config import Settings, get_settings
 from app.deps import Deps, build_deps
 from app.graph.runner import fail_interrupted_runs
@@ -38,6 +38,7 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     app.include_router(auth.router)
     app.include_router(runs.router)
     app.include_router(pages.router)
+    app.include_router(admin.router)
     app.add_exception_handler(pages.SignInRequired, pages.sign_in_redirect)
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
     return app

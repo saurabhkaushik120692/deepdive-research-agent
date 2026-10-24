@@ -168,7 +168,9 @@ and the live site.
    (`openid email profile`), which needs no Google review.
 
 Set `CONTACT_EMAIL` in the server `.env` too: the Privacy and Terms pages show it as the address
-for data and deletion requests.
+for data and deletion requests, and signing in with that Google account opens the admin area at
+`/admin` (every question asked, reset or block users, mark example reports). That account also
+has no free-report limit.
 
 Also set `SESSION_SECRET` (a random string, see the `.env` template above): it signs the login
 cookie, so changing it signs everyone out. After editing the server's `.env`, restart the app:

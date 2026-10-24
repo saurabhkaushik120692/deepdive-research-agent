@@ -295,3 +295,24 @@ table.events code { white-space: pre-wrap; word-break: break-word; font-size: 0.
 .prose h2 { font-size: 1.1rem; margin-top: 1.75rem; }
 .prose li { margin-bottom: 0.3rem; }
 .prose .updated { color: var(--dd-muted); font-size: 0.88rem; }
+
+/* Admin */
+.admin-summary { font-size: 0.9rem; }
+.admin-tabs { display: flex; align-items: center; gap: 1.25rem; border-bottom: 1px solid var(--dd-line); margin-bottom: 1rem; }
+.admin-tabs a { padding: 0.5rem 0; margin-bottom: -1px; color: var(--dd-muted); font-weight: 600; text-decoration: none; border-bottom: 3px solid transparent; }
+.admin-tabs a[aria-current="page"] { color: var(--dd-ink); border-bottom-color: var(--dd-accent); }
+.admin-search { margin: 0 0 0.4rem auto; }
+.admin-search input { width: 17rem; height: auto; margin: 0; padding: 0.3rem 0.8rem; font-size: 0.85rem; }
+.admin-table td { vertical-align: top; }
+.admin-table .nowrap { white-space: nowrap; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.admin-actions form, .admin-example { margin: 0; }
+.admin-actions button { width: auto; margin: 0; padding: 0.2rem 0.6rem; font-size: 0.78rem; }
+.admin-actions button.danger { color: var(--dd-bad); border-color: var(--dd-bad); }
+.admin-example label { margin: 0; font-size: 0.82rem; white-space: nowrap; }
+.admin-example input[type="checkbox"] { margin: 0 0.3rem 0 0; }
+.admin-pages { display: flex; justify-content: flex-end; gap: 1rem; font-size: 0.85rem; color: var(--dd-muted); }
+@media (max-width: 640px) {
+  .admin-tabs { flex-wrap: wrap; }
+  .admin-search, .admin-search input { width: 100%; margin-left: 0; }
+}

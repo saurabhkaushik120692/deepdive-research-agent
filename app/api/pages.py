@@ -8,8 +8,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
-from app.api.auth import can_view, session_user
-from app.api.quota import limit_message, quota_for
+from app.api.auth import admin_user, can_view, session_user
+from app.api.quota import quota_for, start_refusal
 from app.deps import Deps
 from app.graph.schemas import Conflict, SynthesisOutput
 from app.models import (
@@ -73,6 +73,7 @@ def duration(run: Run) -> str:
 
 templates.env.filters["ago"] = time_ago
 templates.env.globals["tier_labels"] = TIER_LABELS
+templates.env.globals["is_admin"] = lambda request: admin_user(request) is not None
 
 router = APIRouter()
 
@@ -88,7 +89,7 @@ class SignInRequired(Exception):
 def _visible_run(session, run_id: str, request: Request) -> Run:
     run = session.get(Run, run_id)
     user = session_user(request)
-    if run is not None and can_view(run, user):
+    if run is not None and can_view(run, user, admin=admin_user(request) is not None):
         return run
     if user is None:
         raise SignInRequired()
@@ -122,7 +123,7 @@ def ask(request: Request):
             "user": user,
             "mine": mine,
             "quota": quota,
-            "limit_message": limit_message(_deps(request).settings),
+            "refusal": quota and start_refusal(quota, _deps(request).settings),
             "example_runs": examples,
             "examples": EXAMPLES,
             "results": latest_eval_results(),

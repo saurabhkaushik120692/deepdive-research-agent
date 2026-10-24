@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% macro plural(n, word) %}{{ n }} {{ word }}{{ "" if n == 1 else "s" }}{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <h1>Admin</h1>
+  <p class="admin-summary">{{ plural(summary.users, "user") }} · {{ plural(summary.reports, "report") }} · {{ summary.failed }} failed this week</p>
+</div>
+
+<nav class="admin-tabs">
+  <a href="/admin" {% if tab == "reports" %}aria-current="page"{% endif %}>Reports</a>
+  <a href="/admin?tab=users" {% if tab == "users" %}aria-current="page"{% endif %}>Users</a>
+  <form method="get" action="/admin" class="admin-search" role="search">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <input type="search" name="q" value="{{ q }}" aria-label="Search"
+      placeholder="{{ 'Search name or email' if tab == 'users' else 'Search questions or emails' }}">
+  </form>
+</nav>
+
+{% set back = request.url.path ~ ("?" ~ request.url.query if request.url.query else "") %}
+<div class="table-card overflow-auto">
+  <table class="admin-table">
+  {% if tab == "users" %}
+    <thead><tr><th>User</th><th>Joined</th><th>Last sign-in</th><th>Free reports</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for u, quota in rows %}
+      <tr>
+        <td><b>{{ u.name }}</b><br><small class="muted">{{ u.email }}</small></td>
+        <td>{{ u.created_at | ago }}</td>
+        <td>{{ u.last_login_at | ago }}</td>
+        <td>{% if quota.limit is none %}no limit <small class="muted">({{ quota.used }} used)</small>{% else %}{{ quota.used }} / {{ quota.limit }}{% endif %}</td>
+        <td>{% if u.blocked %}<span class="badge bad">blocked</span>{% else %}<span class="badge good">active</span>{% endif %}</td>
+        <td class="admin-actions">
+          <form method="post" action="/admin/users/{{ u.id }}/reset">
+            <input type="hidden" name="back" value="{{ back }}">
+            <button type="submit" class="secondary outline">Reset free reports</button>
+          </form>
+          {% if u.id != admin.id %}
+            {% if u.blocked %}
+              <form method="post" action="/admin/users/{{ u.id }}/unblock">
+                <input type="hidden" name="back" value="{{ back }}">
+                <button type="submit" class="secondary outline">Unblock</button>
+              </form>
+            {% else %}
+              <form method="post" action="/admin/users/{{ u.id }}/block">
+                <input type="hidden" name="back" value="{{ back }}">
+                <button type="submit" class="secondary outline danger">Block</button>
+              </form>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="muted">No users match.</td></tr>
+    {% endfor %}
+    </tbody>
+  {% else %}
+    <thead><tr><th>Question</th><th>User</th><th>Status</th><th>When</th><th>Example</th></tr></thead>
+    <tbody>
+    {% for run, u in rows %}
+      <tr>
+        <td><a href="/runs/{{ run.id }}">{{ run.question }}</a></td>
+        <td>{% if u %}{{ u.email }}{% else %}<span class="muted">command line / eval</span>{% endif %}</td>
+        <td><span class="pill status-{{ run.status }}">{{ {"completed": "done"}.get(run.status, run.status) }}</span></td>
+        <td class="nowrap">{{ run.created_at | ago }}</td>
+        <td>
+          {% if run.status == "completed" or run.is_example %}
+            <form method="post" action="/admin/runs/{{ run.id }}/example" class="admin-example">
+              <input type="hidden" name="back" value="{{ back }}">
+              <input type="hidden" name="make" value="{{ '0' if run.is_example else '1' }}">
+              <label><input type="checkbox" {% if run.is_example %}checked{% endif %} onchange="this.form.submit()"> example</label>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">No reports match.</td></tr>
+    {% endfor %}
+    </tbody>
+  {% endif %}
+  </table>
+</div>
+
+{% if pages > 1 %}
+  {% set base = "/admin?tab=" ~ tab ~ ("&q=" ~ (q | urlencode) if q else "") ~ "&page=" %}
+  <p class="admin-pages">
+    {% if page > 1 %}<a href="{{ base }}{{ page - 1 }}">&larr; Newer</a>{% endif %}
+    <span>Page {{ page }} of {{ pages }} ({{ total }} rows)</span>
+    {% if page < pages %}<a href="{{ base }}{{ page + 1 }}">Older &rarr;</a>{% endif %}
+  </p>
+{% endif %}
+{% endblock %}
