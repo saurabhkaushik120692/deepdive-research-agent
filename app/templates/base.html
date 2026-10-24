@@ -22,10 +22,11 @@
       <ul class="nav-links">
         <li><a href="/" {% if request.url.path == "/" %}aria-current="page"{% endif %}>Ask</a></li>
         <li><a href="/eval" {% if request.url.path == "/eval" %}aria-current="page"{% endif %}>Eval</a></li>
-        <li><a href="/docs">API docs</a></li>
-        <li><a href="https://github.com/saurabhkaushik120692/deepdive-research-agent" target="_blank" rel="noopener">GitHub</a></li>
         {% set me = request.session.get("user") %}
-        {% if me and is_admin(request) %}
+        {% set is_admin_user = me and is_admin(request) %}
+        {% if is_admin_user %}<li><a href="/docs">API docs</a></li>{% endif %}
+        <li><a href="https://github.com/saurabhkaushik120692/deepdive-research-agent" target="_blank" rel="noopener">GitHub</a></li>
+        {% if is_admin_user %}
           <li><a href="/admin" {% if request.url.path == "/admin" %}aria-current="page"{% endif %}>Admin</a></li>
         {% endif %}
         {% if me %}

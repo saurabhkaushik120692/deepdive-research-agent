@@ -70,7 +70,14 @@ def _start(client):
 def test_admin_page_is_hidden_from_other_users(make_client):
     client = make_client(contact_email="someone-else@example.com")
     assert client.get("/admin").status_code == 404
-    assert 'href="/admin"' not in client.get("/").text
+    home = client.get("/").text
+    assert 'href="/admin"' not in home
+    assert 'href="/docs"' not in home
+
+
+def test_api_docs_link_is_hidden_when_signed_out(admin):
+    admin.post("/auth/logout")
+    assert 'href="/docs"' not in admin.get("/").text
 
 
 def test_nobody_is_admin_without_a_contact_email(make_client):
@@ -84,7 +91,9 @@ def test_admin_page_is_hidden_when_signed_out(admin):
 
 
 def test_admin_sees_the_admin_link_and_page(admin):
-    assert 'href="/admin"' in admin.get("/").text
+    home = admin.get("/").text
+    assert 'href="/admin"' in home
+    assert 'href="/docs"' in home
     assert admin.get("/admin").status_code == 200
 
 
