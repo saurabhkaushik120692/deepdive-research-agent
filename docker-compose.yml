@@ -1,4 +1,4 @@
-# Local run: docker compose up --build   →   http://localhost:8000
+# Local run: docker compose up --build, then open http://localhost:8000
 services:
   app:
     build: .

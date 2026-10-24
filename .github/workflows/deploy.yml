@@ -1,6 +1,6 @@
 name: deploy
 
-# Push to main → tests → build image → push to ECR → EC2 pulls and restarts (via SSM, no SSH).
+# Push to main: tests, build image, push to ECR, then EC2 pulls and restarts (via SSM, no SSH).
 # AWS auth: the scoped deploy user's access keys from secrets (AWS free plan has no IAM identity
 # providers), or a GitHub OIDC role on a paid plan: set vars.AWS_ROLE_ARN AND delete the key
 # secrets (with both present the action would try to chain from the keys into the role).

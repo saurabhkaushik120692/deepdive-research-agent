@@ -62,7 +62,7 @@ SQLite, and embeddings live in Chroma.
    sub-question with fewer than 2 supported claims goes back to research with a refined query,
    up to 2 extra rounds. If it's still thin, the report says so under *Limited evidence* rather
    than padding.
-4. **Drafter ≠ Synthesizer.** The writer of the final prose never sees unverified claims, and code
+4. **Separate drafter and synthesizer.** The writer of the final prose never sees unverified claims, and code
    drops any paragraph citing an unverified claim or stating a figure its cited claims don't contain.
 5. **Source-quality tiers** (official/academic → major news → other) order the evidence the
    drafter sees and are shown in the report.
@@ -105,7 +105,7 @@ which changes the evidence found, not how the verifier judges it.
 | Cost per run (mean / p95) | $0.040 / $0.059 | $0.039 / $0.056 |
 | Time per run (p50 / p95) | 251 s / 353 s | 242 s / 383 s |
 
-**What the numbers say, honestly:**
+**What the numbers say:**
 - The catch rate moved from 87.0% to 94.5% between runs. Each run drafts different claims, so a
   different set gets altered: the latest run had fewer entity swaps (the hardest kind), and it
   missed no year or direction changes (the previous run missed 2 and 1). Per-kind samples are small
@@ -117,8 +117,8 @@ which changes the evidence found, not how the verifier judges it.
 - Against the hand labels, 6 of the 7 disagreements are the verifier being *more lenient* than a
   human, mostly on claims it marked "partial". Partial claims are shown with a warning marker in
   reports for this reason.
-- The eval caught real problems before judges did. Mesh's 100 requests/minute limit, embedding
-  inputs over 2048 tokens, and an empty-reply edge case all failed runs in the first full eval and
+- Running the full eval surfaced real bugs: Mesh's 100 requests/minute limit, embedding inputs
+  over 2048 tokens, and an empty-reply edge case all failed runs in the first full eval. All three
   are fixed (see [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md#what-live-runs-taught-us)).
 
 ## Run it
@@ -155,7 +155,7 @@ app/tools/       quote matching, source tiers, chunking, search, fetch, vector s
 app/llm.py       the only place that calls models, always through Mesh API
 app/api/         REST + SSE API, HTML pages, Google sign-in
 eval/            question set, planted-error generator, judge, metrics, results
-docs/            design spec, implementation plan, design notes, deploy runbook
+docs/            design notes, deploy runbook
 ```
 
 Design decisions and trade-offs: [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md).

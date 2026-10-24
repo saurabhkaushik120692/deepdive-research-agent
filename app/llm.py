@@ -1,4 +1,4 @@
-"""The ONLY place that talks to models. Every call goes through Mesh (hackathon rule)."""
+"""The only place that talks to models. Every call goes through Mesh (hackathon rule)."""
 
 import asyncio
 import json

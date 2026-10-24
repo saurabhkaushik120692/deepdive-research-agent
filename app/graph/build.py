@@ -1,7 +1,9 @@
 """The coordinator: a LangGraph StateGraph wiring the agents together, with a real loop.
 
-START → plan →(Send per sub-question) research → draft → verify →(route) refine | contradictions
-refine →(Send per thin sub-question) research   ·   contradictions → synthesize → END
+START -> plan -> research (one Send per sub-question) -> draft -> verify
+verify -> refine (thin sub-questions left) | contradictions
+refine -> research (one Send per thin sub-question)
+contradictions -> synthesize -> END
 """
 
 from typing import Literal

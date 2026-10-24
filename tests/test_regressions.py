@@ -1,4 +1,4 @@
-"""Regression tests for findings from the whole-branch review (one test per finding)."""
+"""Regression tests for bugs fixed along the way, one test per bug."""
 
 import random
 import re
@@ -29,7 +29,7 @@ from tests.helpers import (
 )
 from tests.scripts import _drafter, script_happy_path
 
-# --- I1: re-drafted duplicates must not satisfy the loop rule ---------------------------
+# --- re-drafted duplicates must not satisfy the loop rule -------------------------------------
 
 
 async def test_redrafted_duplicate_claims_do_not_satisfy_loop(deps):
@@ -56,7 +56,7 @@ async def test_redrafted_duplicate_claims_do_not_satisfy_loop(deps):
     assert len(b_claims) == 2 and "claim_dropped_duplicate" in event_types(deps, run.id)
 
 
-# --- I2: synthesizer prose is checked (numbers must come from cited claims) ------------
+# --- synthesizer prose is checked (numbers must come from cited claims) -----------------------
 
 
 async def test_paragraph_with_number_not_in_cited_claims_is_dropped(deps):
@@ -123,7 +123,7 @@ async def test_synthesizer_api_failure_still_produces_a_report(deps, kind):
     assert fallback and "Error" in fallback[0].payload["reason"]
 
 
-# --- I3: runs orphaned by a restart are marked failed on startup -----------------------
+# --- runs orphaned by a restart are marked failed on startup ----------------------------------
 
 
 def test_startup_marks_interrupted_runs_failed(deps):
@@ -140,7 +140,7 @@ def test_startup_marks_interrupted_runs_failed(deps):
     assert "run_failed" in event_types(deps, "orphan")
 
 
-# --- I4 / d / I8: LLM client hardening -------------------------------------------------
+# --- LLM client hardening ---------------------------------------------------------------------
 
 
 def test_default_client_has_bounded_timeout_and_no_sdk_retries(settings):
@@ -170,7 +170,7 @@ async def test_embed_is_batched_and_keeps_order(settings):
     assert [v[0] for v in vecs] == [float(len(t)) for t in texts]
 
 
-# --- I5: fuzzy quote matching can't flip meaning ---------------------------------------
+# --- fuzzy quote matching can't flip meaning --------------------------------------------------
 
 SRC = "The policy was effective at reducing emissions in the region."
 
@@ -195,7 +195,7 @@ def test_dropped_punctuation_still_matches():
     assert quote_in_chunk("The policy was effective at reducing emissions in the region", SRC)
 
 
-# --- I6: latency is measured from when the run started, not when it was queued ---------
+# --- latency is measured from when the run started, not when it was queued --------------------
 
 
 async def test_run_records_started_at(deps):
@@ -222,7 +222,7 @@ async def test_eval_latency_excludes_queue_time(deps):
     assert run_stats(deps, [run.id])["latency_s"]["p50"] < 3600
 
 
-# --- a / f: fetch robustness and caching ----------------------------------------------
+# --- fetch robustness and caching -------------------------------------------------------------
 
 
 async def test_fetch_unexpected_exception_returns_none(session_factory):
@@ -271,7 +271,7 @@ async def test_permanent_fetch_failure_is_cached(session_factory):
     assert len(calls) == 1
 
 
-# --- b: short Tavily stubs fall back to fetching; fetch errors are isolated -----------
+# --- short Tavily stubs fall back to fetching; fetch errors are isolated ----------------------
 
 
 async def test_short_raw_content_falls_back_to_fetch(deps, run, sq):
@@ -299,7 +299,7 @@ async def test_fetcher_exception_is_skipped_not_fatal(deps, run, sq):
     assert "source_skipped" in event_types(deps, run.id)
 
 
-# --- e: one bad judge reply doesn't abort the eval ------------------------------------
+# --- one bad judge reply doesn't abort the eval -----------------------------------------------
 
 
 async def test_eval_survives_judge_errors(deps, tmp_path):
@@ -314,7 +314,7 @@ async def test_eval_survives_judge_errors(deps, tmp_path):
     assert j["errors"] == 1 and j["n"] == 5 and j["groundedness"] == 1.0
 
 
-# --- wording: thin sub-questions may still have some verified evidence -----------------
+# --- thin sub-questions may still have some verified evidence ---------------------------------
 
 
 def test_limited_evidence_wording_is_accurate():
@@ -326,7 +326,7 @@ def test_limited_evidence_wording_is_accurate():
     assert "says nothing about them" not in md and "limited verified evidence" in md
 
 
-# --- live run 1: per-sub-question LLM stages must run concurrently ----------------------
+# --- per-sub-question LLM stages must run concurrently ----------------------------------------
 
 
 class _ConcurrencyProbe:
@@ -360,7 +360,7 @@ async def test_drafter_and_contradictions_run_subquestions_concurrently(deps):
     assert probe.peak["drafter"] == 3 and probe.peak["contradictions"] == 3
 
 
-# --- every verified claim reaches the report ----------------------------------------------
+# --- every verified claim reaches the report --------------------------------------------------
 
 
 def _synth_citing(pick):

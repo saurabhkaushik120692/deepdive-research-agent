@@ -45,7 +45,7 @@ EVAL_DIR = Path(__file__).parent
 RESULTS_DIR = EVAL_DIR / "results"
 QUESTIONS = EVAL_DIR / "questions.jsonl"
 
-# USD per 1M tokens (input, output), from the Mesh model list on 2026-10-18 (spec §4.5).
+# USD per 1M tokens (input, output), from the Mesh model list on 2026-10-18.
 PRICES = {
     "openai/gpt-5-nano": (0.05, 0.40),
     "anthropic/claude-haiku-5.5": (0.10, 0.50),

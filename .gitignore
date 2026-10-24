@@ -11,6 +11,5 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# tooling scratch
-.superpowers/
+# hackathon checks script (downloaded by CI)
 checks.py

@@ -37,7 +37,7 @@ def normalize(s: str) -> str:
 
 
 def _words(s: str) -> list[str]:
-    """Punctuation-insensitive word list ("isn't" → "is not")."""
+    """Punctuation-insensitive word list ("isn't" becomes "is not")."""
     return re.sub(r"[^a-z0-9%]+", " ", s.replace("n't", " not")).split()
 
 

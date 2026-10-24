@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-DeepDive is a hackathon entry (Agent Arena 2026, Track 01): a multi-agent research system that produces cited reports in which every claim has been verified against the exact source text. The design is in `docs/superpowers/specs/2026-10-18-deepdive-design.md`. The task-by-task build plan is in `docs/superpowers/plans/2026-10-18-deepdive-research-agent.md`; check the plan's progress ledger at `.superpowers/sdd/2026-10-18-deepdive-research-agent/progress.md` before starting work.
+DeepDive is a hackathon entry (Agent Arena 2026, Track 01): a multi-agent research system that produces cited reports in which every claim has been verified against the exact source text. Design decisions are in `docs/DESIGN_NOTES.md`; deployment steps are in `docs/DEPLOY.md`.
 
 ## Commands
 

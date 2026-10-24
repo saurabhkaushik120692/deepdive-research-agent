@@ -20,7 +20,7 @@ supports both; it uses the role whenever the `AWS_ROLE_ARN` variable is set.
 
 ---
 
-## 0. Account safety (done in Task 0)
+## 0. Account safety
 Root MFA on, $10 budget alert on.
 
 ## 1. ECR repository

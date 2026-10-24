@@ -41,7 +41,7 @@ async def verify_claim(
 
 
 async def verify_node(state: ResearchState, config: RunnableConfig) -> dict:
-    """Check every not-yet-verified claim against ONLY the chunk(s) it cites."""
+    """Check every not-yet-verified claim against only the chunk(s) it cites."""
     deps = get_deps(config)
     run_id = state["run_id"]
     with node_events(deps, run_id, "verifier", round=state["round"]):

@@ -78,7 +78,7 @@ async def test_researcher_drops_noise_chunks(deps, run, sq):
         SearchResult("https://b.org/t", "B", table),
     ]
     await research_node({"run_id": run.id, "sub_question_id": sq.id, "round": 0}, cfg(deps))
-    assert chunk_count(deps, sq.id) == 2  # prose only (~4500 chars → 2 chunks); table dropped
+    assert chunk_count(deps, sq.id) == 2  # prose only (~4500 chars, 2 chunks); table dropped
 
 
 async def test_retry_failed_reruns_only_failed_questions(deps):

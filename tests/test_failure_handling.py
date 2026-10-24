@@ -1,4 +1,4 @@
-"""Regression tests for the pre-publication review (changes since the first whole-branch review)."""
+"""Failure handling: one failing step or service must not sink the run or the eval."""
 
 import asyncio
 import random
@@ -28,7 +28,7 @@ class Out(BaseModel):
     answer: str
 
 
-# --- I1: a failing sub-question must not leave siblings running after run_failed ----------
+# --- a failing sub-question must not leave siblings running after run_failed ------------------
 
 
 class _SlowSiblings:
@@ -71,7 +71,7 @@ async def test_transport_error_cancels_sibling_drafts_and_reports_clearly(deps):
     assert all(e.id < failed_at for e in events(deps, run.id) if e.type == "claims_drafted")
 
 
-# --- M4: contradiction check never fails a finished run ---------------------------------
+# --- contradiction check never fails a finished run -------------------------------------------
 
 
 async def test_contradiction_transport_error_does_not_fail_run(deps):
@@ -83,7 +83,7 @@ async def test_contradiction_transport_error_does_not_fail_run(deps):
     assert "contradiction_check_failed" in event_types(deps, run.id)
 
 
-# --- I2 / M5: responsive run creation, sane retry budgets --------------------------------
+# --- responsive run creation, sane retry budgets ----------------------------------------------
 
 
 def test_slow_moderation_does_not_block_run_creation(deps, monkeypatch):
@@ -131,7 +131,7 @@ async def test_rate_window_is_consumed_only_when_a_slot_is_held(settings):
     assert seen == [True]
 
 
-# --- M2: very long "words" can't explode the chunk count ---------------------------------
+# --- very long "words" can't explode the chunk count ------------------------------------------
 
 
 def test_long_words_do_not_collapse_overlap():
@@ -143,7 +143,7 @@ def test_long_words_do_not_collapse_overlap():
     assert chunks[-1].split()[-1] == text.split()[-1]
 
 
-# --- M6 / M7: eval robustness and wording ------------------------------------------------
+# --- eval robustness and wording --------------------------------------------------------------
 
 
 async def test_eval_tolerates_transport_errors_from_judge_and_entity_swap(deps, tmp_path):
@@ -221,7 +221,7 @@ def test_results_page_wording_reflects_labels():
     assert "n/a until" not in labelled and "n/a until" in unlabelled
 
 
-# --- M1: colour highlighting must not corrupt its own escape codes -----------------------
+# --- colour highlighting must not corrupt its own escape codes --------------------------------
 
 
 def test_colour_highlight_keeps_text_intact():

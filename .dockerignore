@@ -4,7 +4,6 @@ data/
 .github/
 .venv/
 .claude/
-.superpowers/
 tests/
 docs/
 deploy/

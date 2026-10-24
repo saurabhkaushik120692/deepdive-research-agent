@@ -39,7 +39,7 @@ async def test_build_deps_logs_llm_usage_as_events(tmp_path):
         s.commit()
         run_id = run.id
     deps.llm.on_usage(run_id, {"role": "planner", "prompt_tokens": 5})
-    deps.llm.on_usage(None, {"role": "planner"})  # no run → not logged
+    deps.llm.on_usage(None, {"role": "planner"})  # no run, so not logged
     with deps.session_factory() as s:
         events = s.exec(select(Event).where(Event.type == "llm_call")).all()
     assert len(events) == 1 and events[0].payload["prompt_tokens"] == 5

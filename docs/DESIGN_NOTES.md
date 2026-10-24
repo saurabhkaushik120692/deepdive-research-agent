@@ -1,7 +1,6 @@
 # Key design decisions
 
-Short notes on the choices that shape DeepDive, and why. The full design is in
-`docs/superpowers/specs/2026-10-18-deepdive-design.md`.
+Short notes on the choices that shape DeepDive, and why.
 
 ## Verification
 
@@ -61,11 +60,9 @@ Short notes on the choices that shape DeepDive, and why. The full design is in
 ## Engineering constraints
 
 - **Python 3.11 syntax only.** The organizers' CI compiles every file with Python 3.11; ruff's
-  `target-version = "py311"`, a pre-commit compile hook and a Claude Code edit hook catch
-  3.12-only syntax early.
-- **Public demo protection**: an access-code cookie gate, an hourly run limit, at most 2
+  `target-version = "py311"` and a pre-commit compile hook catch 3.12-only syntax early.
+- **Public demo protection**: Google sign-in to start a run, an hourly run limit, at most 2
   concurrent runs, and a moderation screen on questions (Mesh's free moderation model).
-
 - **Security review before going public**: full-history secret scan (no keys ever committed),
   `pip-audit` on the locked dependencies (certifi upgraded; the open chromadb advisories concern
   Chroma's standalone HTTP server, which DeepDive never runs; it uses the embedded client), no
@@ -88,7 +85,7 @@ regression test.
 | First live run | Search results arrive as markdown full of links: 600 "words" were ~14k characters, over the embedding model's 2048-token input limit | Strip links/URLs, cap chunks at 3,000 characters, truncate embedding input to 1,000 |
 | Second live run | 9.5 min per run: sub-questions were drafted one after another, each a 45–120 s reasoning call | Draft and check contradictions for all sub-questions concurrently → ~4 min |
 | Second live run | The synthesizer copied internal "(partial)" markers and added attributions ("according to the IEA") that its claims didn't contain | Prompt rules + a code check that prose figures come from the cited claims |
-| Timeout review | A 60 s timeout cut off normal 60–120 s reasoning calls, which were retried (and billed) from scratch | 180 s timeout, still bounding truly hung calls |
+| Live runs | A 60 s timeout cut off normal 60–120 s reasoning calls, which were retried (and billed) from scratch | 180 s timeout, still bounding truly hung calls |
 | First full eval | Mesh allows 100 requests/minute; two runs at once burst past it and short retries gave up (12 of 24 runs failed) | Shared sliding-window limiter at 80/min; 429s wait for the window to reset |
 | First full eval | Number tables, leader-dot tables of contents and SVG markup pack >1 token per character (3 runs failed) | Drop chunks that are mostly digits/symbols; they held no quotable evidence anyway |
 | Second full eval | An empty verifier reply was echoed back in the JSON-repair turn; Anthropic rejects empty messages, failing the call | Never send an empty assistant turn; eval counts per-claim API errors instead of aborting |

@@ -20,7 +20,7 @@ def clean_text(text: str) -> str:
 def chunk_text(
     text: str, max_words: int = 600, overlap_words: int = 75, max_chars: int = 3000
 ) -> list[str]:
-    """Split text into overlapping word windows (~600 words ≈ 800 tokens), never longer than
+    """Split text into overlapping word windows (~600 words, about 800 tokens), never longer than
     max_chars, so every chunk fits the embedding model's input limit."""
     words = []
     for w in text.split():  # a single "word" longer than max_chars is hard-split
