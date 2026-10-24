@@ -137,6 +137,32 @@ def set_example(
         if make == "1" and run.status != "completed":
             raise HTTPException(status_code=400, detail="only finished reports can be examples")
         run.is_example = make == "1"
+        run.is_featured = run.is_featured and run.is_example
+        session.add(run)
+        session.commit()
+    return _back(back)
+
+
+@router.post("/runs/{run_id}/feature")
+def set_featured(
+    run_id: str,
+    request: Request,
+    admin: Admin,
+    make: Annotated[str, Form()] = "1",
+    back: Back = None,
+):
+    """Choose the example report whose verdicts the home page shows; only one at a time."""
+    with request.app.state.deps.session_factory() as session:
+        run = session.get(Run, run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="run not found")
+        if make == "1" and not run.is_example:
+            raise HTTPException(status_code=400, detail="only example reports can be featured")
+        if make == "1":
+            for other in session.exec(select(Run).where(Run.is_featured)).all():
+                other.is_featured = False
+                session.add(other)
+        run.is_featured = make == "1"
         session.add(run)
         session.commit()
     return _back(back)

@@ -71,6 +71,13 @@
               <label><input type="checkbox" {% if run.is_example %}checked{% endif %} onchange="this.form.submit()"> example</label>
             </form>
           {% endif %}
+          {% if run.is_example %}
+            <form method="post" action="/admin/runs/{{ run.id }}/feature" class="admin-example">
+              <input type="hidden" name="back" value="{{ back }}">
+              <input type="hidden" name="make" value="{{ '0' if run.is_featured else '1' }}">
+              <label title="Show this report's verdicts on the home page"><input type="checkbox" {% if run.is_featured %}checked{% endif %} onchange="this.form.submit()"> home page</label>
+            </form>
+          {% endif %}
         </td>
       </tr>
     {% else %}

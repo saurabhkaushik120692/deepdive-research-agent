@@ -219,6 +219,7 @@ def test_results_page_wording_reflects_labels():
         {**base, "gold": {"n_labelled": 0, "accuracy": None, "kappa": None}}
     )
     assert "n/a until" not in labelled and "n/a until" in unlabelled
+    assert "Cost" not in labelled and "USD" not in labelled  # per-run cost varies; not published
 
 
 # --- colour highlighting must not corrupt its own escape codes --------------------------------

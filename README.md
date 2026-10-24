@@ -17,7 +17,7 @@ often doesn't say what the sentence claims. DeepDive's focus is making the citat
 | Report claims judged grounded by an independent model | **94.0%** of 100 | 94.0% of 100 |
 | Agreement with 50 hand-labelled claims | **86.0%** (Cohen's κ 0.70) | same labels |
 | Verifier quotes found verbatim in the source | **99.3%** | 99.5% |
-| Cost / time per research run | **$0.04** / ~4 min | $0.04 / ~4 min |
+| Time per research run | ~4 min | ~4 min |
 
 **Live demo:** https://16.178.82.245.nip.io (sign in with Google to start a run; example reports are public).
 
@@ -80,7 +80,7 @@ and measures:
   re-checks claims cited in final reports, so the verifier isn't grading its own homework.
 - **Agreement with hand labels.** 50 claims labelled by hand against their sources (accuracy and
   Cohen's kappa).
-- Quote validity, loop rate, sub-question coverage, cost and latency per run.
+- Quote validity, loop rate, sub-question coverage and time per run.
 
 ### Results ([`eval/RESULTS.md`](eval/RESULTS.md), also on the app's `/eval` page)
 
@@ -102,7 +102,6 @@ which changes the evidence found, not how the verifier judges it.
 | Drafted claims rejected by the verifier | 7.2% (105 of 1,455) | 7.5% (108 of 1,433) |
 | Runs that looped back to research | 20.8% | 20.8% |
 | Sub-questions ending with enough verified support | 99.1% of 112 | 100% of 115 |
-| Cost per run (mean / p95) | $0.040 / $0.059 | $0.039 / $0.056 |
 | Time per run (p50 / p95) | 251 s / 353 s | 242 s / 383 s |
 
 **What the numbers say:**

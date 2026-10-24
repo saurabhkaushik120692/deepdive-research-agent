@@ -36,6 +36,7 @@ class Run(SQLModel, table=True):
     question: str
     user_id: int | None = Field(default=None, foreign_key="user.id", index=True)  # None: eval/CLI
     is_example: bool = False  # public example report, visible to everyone
+    is_featured: bool = False  # the example whose verdicts the home page shows (at most one)
     status: str = "queued"  # queued | running | completed | failed
     models: dict = Field(default_factory=dict, sa_column=Column(JSON))
     error: str | None = None

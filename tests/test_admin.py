@@ -262,3 +262,63 @@ def test_init_db_adds_admin_columns_to_an_old_user_table(tmp_path):
     with Session(engine) as s:
         user = s.exec(select(User)).one()
     assert (user.blocked, user.quota_reset_at) == (False, None)
+
+
+# --- featured report on the home page -------------------------------------------------------
+
+
+def _feature(client, run_id, make="1"):
+    return client.post(f"/admin/runs/{run_id}/feature", data={"make": make}, follow_redirects=False)
+
+
+def _flags(deps, run_id):
+    with deps.session_factory() as s:
+        run = s.get(Run, run_id)
+        return run.is_example, run.is_featured
+
+
+def test_featuring_picks_one_example_for_the_home_page(deps, admin):
+    a, b = _seed(deps, None, "completed", "completed")
+    for run_id in (a, b):
+        admin.post(f"/admin/runs/{run_id}/example", data={"make": "1"})
+    assert _feature(admin, a).status_code == 303
+    assert _flags(deps, a) == (True, True)
+    _feature(admin, b)
+    assert _flags(deps, a) == (True, False)  # only one featured at a time
+    assert _flags(deps, b) == (True, True)
+    _feature(admin, b, make="0")
+    assert _flags(deps, b) == (True, False)
+
+
+def test_only_example_reports_can_be_featured(deps, admin):
+    (run_id,) = _seed(deps, None, "completed")
+    assert _feature(admin, run_id).status_code == 400
+    assert _flags(deps, run_id) == (False, False)
+
+
+def test_removing_an_example_also_removes_it_from_the_home_page(deps, admin):
+    (run_id,) = _seed(deps, None, "completed")
+    admin.post(f"/admin/runs/{run_id}/example", data={"make": "1"})
+    _feature(admin, run_id)
+    admin.post(f"/admin/runs/{run_id}/example", data={"make": "0"})
+    assert _flags(deps, run_id) == (False, False)
+
+
+def test_non_admins_cannot_feature(deps, make_client):
+    client = make_client(contact_email="someone-else@example.com")
+    (run_id,) = _seed(deps, None, "completed")
+    with deps.session_factory() as s:
+        run = s.get(Run, run_id)
+        run.is_example = True
+        s.add(run)
+        s.commit()
+    assert _feature(client, run_id).status_code == 404
+    assert _flags(deps, run_id) == (True, False)
+
+
+def test_reports_tab_offers_the_home_page_toggle_on_examples_only(deps, admin):
+    example, plain = _seed(deps, None, "completed", "completed")
+    admin.post(f"/admin/runs/{example}/example", data={"make": "1"})
+    html = admin.get("/admin").text
+    assert f'action="/admin/runs/{example}/feature"' in html
+    assert f'action="/admin/runs/{plain}/feature"' not in html

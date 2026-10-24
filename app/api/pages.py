@@ -104,20 +104,26 @@ def sign_in_redirect(request: Request, exc: SignInRequired) -> RedirectResponse:
 def ask(request: Request):
     user = session_user(request)
     with _deps(request).session_factory() as session:
+        # Failed runs stay out of the home lists (admin still sees them).
         examples = session.exec(
-            select(Run).where(Run.is_example).order_by(Run.created_at.desc()).limit(6)
+            select(Run)
+            .where(Run.is_example, Run.status != "failed")
+            .order_by(Run.created_at.desc())
+            .limit(6)
         ).all()
         mine, quota = [], None
         if user is not None:
             mine = session.exec(
                 select(Run)
-                .where(Run.user_id == user["id"])
+                .where(Run.user_id == user["id"], Run.status != "failed")
                 .order_by(Run.created_at.desc())
                 .limit(8)
             ).all()
             quota = quota_for(session, user["id"], _deps(request).settings)
+        featured = session.exec(select(Run).where(Run.is_featured, Run.is_example)).first()
         done = [r for r in examples if r.status == "completed"]
-        samples = _verdict_samples(session, done[0].id) if done else []
+        shown = featured or (done[0] if done else None)  # the admin's pick, else the newest
+        samples = _verdict_samples(session, shown.id) if shown else []
     return templates.TemplateResponse(
         request,
         "ask.html",

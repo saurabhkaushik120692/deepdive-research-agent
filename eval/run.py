@@ -312,7 +312,6 @@ def _num(x, digits=2) -> str:
 
 def render_results_md(r: dict) -> str:
     p, j, g, c = r["verifier_probe"], r["independent_judge"], r["gold"], r["claims"]
-    cost = r["cost"]["per_run_usd"]
     rows = [
         ("Runs completed", f"{r['runs']['completed']} / {r['runs']['total']}"),
         (
@@ -352,10 +351,6 @@ def render_results_md(r: dict) -> str:
         (
             "Sub-questions with enough verified support",
             f"{_pct(r['coverage']['ok_rate'])} of {r['coverage']['sub_questions']}",
-        ),
-        (
-            "Cost per run (mean / p95, USD)",
-            f"{_num(cost['mean'], 4)} / {_num(cost['p95'], 4)}",
         ),
         (
             "Latency per run (p50 / p95, s)",

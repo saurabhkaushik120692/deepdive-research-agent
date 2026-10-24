@@ -140,3 +140,51 @@ def test_home_has_no_verdict_card_without_examples(client, seeded_run):  # noqa:
 def test_only_the_home_page_gets_the_moving_aurora(client, seeded_run):  # noqa: F811
     assert '<body class="home">' in client.get("/").text
     assert '<body class="">' in client.get(f"/runs/{seeded_run.id}").text
+
+
+def test_home_verdicts_come_from_the_featured_example(client, deps, seeded_run):  # noqa: F811
+    with deps.session_factory() as s:
+        newer = Run(question="A newer example?", status="completed", models={}, is_example=True)
+        s.add(newer)
+        run = s.get(Run, seeded_run.id)
+        run.is_example = run.is_featured = True
+        s.add(run)
+        s.commit()
+    html = client.get("/").text  # the newer example has no claims, so a fallback would show none
+    assert "Demand rose 28%." in html
+    assert f'href="/runs/{seeded_run.id}">Open the report' in html
+
+
+def test_home_runs_card_has_your_runs_and_examples_tabs(client, deps, seeded_run):  # noqa: F811
+    with deps.session_factory() as s:
+        run = s.get(Run, seeded_run.id)
+        run.is_example = True
+        s.add(run)
+        s.commit()
+    html = client.get("/").text
+    assert 'data-tab="mine" aria-selected="true"' in html
+    assert 'data-tab="examples" aria-selected="false"' in html
+    assert 'data-panel="examples" role="tabpanel" hidden' in html  # Your runs shows first
+
+
+def test_home_shows_no_cost_per_run(client, eval_results):  # noqa: F811
+    html = client.get("/").text
+    assert "$0.04" not in html and "per_run_usd" not in html
+    assert "about 4 min per run" in html
+
+
+def test_home_run_list_hides_failed_runs_and_done_badges(client, deps):  # noqa: F811
+    with deps.session_factory() as s:
+        for question, status in [
+            ("A finished question?", "completed"),
+            ("A question still running?", "running"),
+            ("A question that failed?", "failed"),
+        ]:
+            s.add(Run(question=question, status=status, models={}, user_id=client.user_id))
+        s.add(Run(question="A failed example?", status="failed", models={}, is_example=True))
+        s.commit()
+    html = client.get("/").text
+    assert "A finished question?" in html and "A question still running?" in html
+    assert "A question that failed?" not in html and "A failed example?" not in html
+    assert ">running</span>" in html  # in-progress runs still say so
+    assert ">done</span>" not in html and "status-completed" not in html

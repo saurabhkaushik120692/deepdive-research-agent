@@ -22,7 +22,6 @@ Generated 2026-10-21 16:48 UTC on 24 questions from `eval/questions.jsonl`.
 | Runs that looped back to research | 20.8% |
 | Mean extra research rounds | 0.29 |
 | Sub-questions with enough verified support | 99.1% of 112 |
-| Cost per run (mean / p95, USD) | 0.0398 / 0.0591 |
 | Latency per run (p50 / p95, s) | 251 / 353 |
 
 ## What these numbers mean

@@ -196,7 +196,7 @@ def test_home_signed_out_shows_examples_and_google_button(client, deps):
     _run(deps, example=True, question="Example: RBI repo rate in 2025?")
     _run(deps, user_id=None, question="Someone's private question?")
     html = client.get("/").text
-    assert "Example reports" in html and "Example: RBI repo rate in 2025?" in html
+    assert ">Examples</button>" in html and "Example: RBI repo rate in 2025?" in html
     assert "Someone&#39;s private question?" not in html and "private question" not in html
     assert "Continue with Google" in html and 'href="/auth/login' in html
 
@@ -230,7 +230,7 @@ def test_init_db_adds_owner_columns_to_an_old_database(tmp_path):
     init_db(engine)
     init_db(engine)  # idempotent
     cols = {c["name"] for c in inspect(engine).get_columns("run")}
-    assert {"user_id", "is_example"} <= cols
+    assert {"user_id", "is_example", "is_featured"} <= cols
     with engine.connect() as c:
         assert c.exec_driver_sql("SELECT is_example, user_id FROM run").one() == (0, None)
 
