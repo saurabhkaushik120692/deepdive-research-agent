@@ -188,3 +188,74 @@ def test_home_run_list_hides_failed_runs_and_done_badges(client, deps):  # noqa:
     assert "A question that failed?" not in html and "A failed example?" not in html
     assert ">running</span>" in html  # in-progress runs still say so
     assert ">done</span>" not in html and "status-completed" not in html
+
+
+def test_verdict_card_names_the_report_it_comes_from(client, deps, seeded_run):  # noqa: F811
+    with deps.session_factory() as s:
+        run = s.get(Run, seeded_run.id)
+        run.is_example = True
+        s.add(run)
+        s.commit()
+    html = client.get("/").text
+    card = html[html.index("Real verdicts") :]
+    assert "EV battery risks 2026?" in card[: card.index("Open the report")]
+
+
+def _report_with_claims(deps, claims):
+    from app.models import Claim, SubQuestion, Verdict
+
+    with deps.session_factory() as s:
+        run = Run(question="Chip fabs?", status="completed", models={}, is_example=True)
+        s.add(run)
+        s.commit()
+        sq = SubQuestion(run_id=run.id, text="Fabs?", query="q", status="ok")
+        s.add(sq)
+        s.commit()
+        for text, label in claims:
+            c = Claim(run_id=run.id, sub_question_id=sq.id, text=text, chunk_ids=[])
+            s.add(c)
+            s.commit()
+            s.add(Verdict(claim_id=c.id, label=label, quote="", quote_found=False, reason="r"))
+        s.commit()
+        return run.id
+
+
+def test_verdict_samples_prefer_claims_that_make_sense_alone(deps):
+    from app.api.pages import _verdict_samples
+
+    run_id = _report_with_claims(
+        deps,
+        [
+            ("Land leased for 60 years.", "supported"),
+            ("Tata Electronics is building a fab in Dholera worth Rs 91,000 crore.", "supported"),
+            ("Micron's Sanand plant began assembly and testing work in 2025.", "supported"),
+            ("It grew.", "supported"),
+            ("Bad.", "unsupported"),
+            ("Four fabs were approved under ISM 2.0 by March 2026.", "unsupported"),
+        ],
+    )
+    seen = []
+
+    def pick(candidates):
+        seen.append([c[0].text for c in candidates])
+        return candidates[0]
+
+    with deps.session_factory() as s:
+        samples = _verdict_samples(s, run_id, pick=pick)
+    supported, rejected = seen
+    # rotation happens among the readable claims only; the fragments never show
+    assert set(supported) == {
+        "Tata Electronics is building a fab in Dholera worth Rs 91,000 crore.",
+        "Micron's Sanand plant began assembly and testing work in 2025.",
+    }
+    assert rejected == ["Four fabs were approved under ISM 2.0 by March 2026."]
+    assert [x["label"] for x in samples] == ["supported", "unsupported"]
+
+
+def test_verdict_samples_fall_back_to_whatever_the_report_has(deps):
+    from app.api.pages import _verdict_samples
+
+    run_id = _report_with_claims(deps, [("It grew.", "supported")])
+    with deps.session_factory() as s:
+        samples = _verdict_samples(s, run_id)
+    assert [x["text"] for x in samples] == ["It grew."]

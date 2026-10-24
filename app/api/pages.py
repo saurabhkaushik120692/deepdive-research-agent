@@ -1,4 +1,6 @@
 import json
+import random
+import re
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -6,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlmodel import func, select
+from sqlmodel import select
 
 from app.api.auth import admin_user, can_view, session_user
 from app.api.quota import quota_for, start_refusal
@@ -133,6 +135,7 @@ def ask(request: Request):
             "quota": quota,
             "refusal": quota and start_refusal(quota, _deps(request).settings),
             "samples": samples,
+            "sample_question": shown.question if samples else "",
             "example_runs": examples,
             "examples": EXAMPLES,
             "results": latest_eval_results(),
@@ -141,21 +144,33 @@ def ask(request: Request):
     )
 
 
-def _verdict_samples(session, run_id: str) -> list[dict]:
-    """One supported and one rejected claim from a report, shortest first, for the home page."""
+def _readability(text: str) -> int:
+    """How well a claim reads on its own: a full sentence, with a figure and a name in it."""
+    score = 2 if 50 <= len(text) <= 160 else 1 if 30 <= len(text) <= 200 else 0
+    score += bool(re.search(r"\d", text))
+    score += bool(re.search(r"\b[A-Z][A-Za-z]+", text[1:]))  # a name after the first letter
+    return score
+
+
+def _verdict_samples(session, run_id: str, pick=random.choice) -> list[dict]:
+    """One supported and one rejected claim from a report for the home page. Each visit picks
+    among the few claims that read best on their own, so the card changes between visits."""
     samples = []
     for label in ("supported", "unsupported"):
-        row = session.exec(
+        rows = session.exec(
             select(Claim, Verdict)
             .join(Verdict, Verdict.claim_id == Claim.id)
             .where(Claim.run_id == run_id, Verdict.label == label)
-            .order_by(func.length(Claim.text))
-        ).first()
-        if row:
-            claim, verdict = row
-            samples.append(
-                {"run_id": run_id, "label": label, "text": claim.text, "reason": verdict.reason}
-            )
+            .order_by(Claim.id)
+        ).all()
+        if not rows:
+            continue
+        rows = sorted(rows, key=lambda row: -_readability(row[0].text))
+        best = _readability(rows[0][0].text)
+        claim, verdict = pick([r for r in rows[:5] if _readability(r[0].text) >= best - 1])
+        samples.append(
+            {"run_id": run_id, "label": label, "text": claim.text, "reason": verdict.reason}
+        )
     return samples
 
 

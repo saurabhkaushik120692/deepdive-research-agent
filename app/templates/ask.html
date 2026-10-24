@@ -91,6 +91,7 @@
   {% if samples %}
     <div class="glass verdicts">
       <p class="eyebrow">Real verdicts from an example report</p>
+      <p class="verdicts-q">{{ sample_question }}</p>
       {% for s in samples %}
         <div class="verdict-line {{ 'ok' if s.label == 'supported' else 'no' }}">
           <i aria-hidden="true">{{ "✓" if s.label == "supported" else "✕" }}</i>
