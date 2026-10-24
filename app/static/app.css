@@ -148,7 +148,11 @@ button.chip:hover { background: var(--dd-accent-bg); border-color: var(--dd-acce
   background: var(--dd-card); color: var(--dd-ink); border: 1px solid #c9d1dd; font-weight: 600;
 }
 .google-btn:hover { background: var(--dd-soft); color: var(--dd-ink); text-decoration: none; }
-.signin-note { text-align: center; font-size: 0.8rem; color: var(--dd-muted); margin: 0.5rem 0 0; }
+.signin-note, .quota-note { text-align: center; font-size: 0.8rem; color: var(--dd-muted); margin: 0.5rem 0 0; }
+.quota-note.used-up {
+  font-size: 0.85rem; color: var(--dd-warn); background: var(--dd-warn-bg);
+  padding: 0.5rem 0.75rem; border-radius: 8px;
+}
 .run-empty { padding: 0.8rem 0.9rem; margin: 0; color: var(--dd-muted); font-size: 0.9rem; }
 
 /* Home: recent runs */

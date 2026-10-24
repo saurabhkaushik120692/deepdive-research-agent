@@ -9,6 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
 from app.api.auth import can_view, session_user
+from app.api.quota import limit_message, quota_for
 from app.deps import Deps
 from app.graph.schemas import Conflict, SynthesisOutput
 from app.models import (
@@ -105,7 +106,7 @@ def ask(request: Request):
         examples = session.exec(
             select(Run).where(Run.is_example).order_by(Run.created_at.desc()).limit(6)
         ).all()
-        mine = []
+        mine, quota = [], None
         if user is not None:
             mine = session.exec(
                 select(Run)
@@ -113,12 +114,15 @@ def ask(request: Request):
                 .order_by(Run.created_at.desc())
                 .limit(8)
             ).all()
+            quota = quota_for(session, user["id"], _deps(request).settings)
     return templates.TemplateResponse(
         request,
         "ask.html",
         {
             "user": user,
             "mine": mine,
+            "quota": quota,
+            "limit_message": limit_message(_deps(request).settings),
             "example_runs": examples,
             "examples": EXAMPLES,
             "results": latest_eval_results(),

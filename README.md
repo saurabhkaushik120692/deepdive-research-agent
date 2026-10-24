@@ -145,7 +145,8 @@ GitHub Actions → ECR → EC2 (deploy through SSM, no SSH), with Caddy for HTTP
 authenticates with an OIDC role when available; on the AWS free plan (no IAM identity providers)
 it falls back to a deploy-only IAM user whose key can only push to this repository and send
 commands to this one instance. Starting a run needs Google sign-in, each user sees only their own runs (plus public example
-reports), and an hourly run limit caps cost. Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+reports), each account gets 5 free reports (failed runs don't count), and an hourly run limit
+caps cost. Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Project layout
 

@@ -10,6 +10,7 @@ from sqlmodel import func, select
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.auth import can_view, require_user, session_user
+from app.api.quota import limit_message, quota_for
 from app.deps import Deps
 from app.graph.runner import create_run, run_research
 from app.models import Claim, Event, Report, Run, SearchRecord, Source, SubQuestion, Verdict
@@ -56,6 +57,8 @@ async def start_run(
 
     cutoff = datetime.now(UTC) - timedelta(hours=1)
     with deps.session_factory() as session:
+        if quota_for(session, user["id"], deps.settings).exhausted:
+            raise HTTPException(status_code=403, detail=limit_message(deps.settings))
         recent = session.exec(select(func.count()).where(Run.created_at >= cutoff)).one()
         if recent >= deps.settings.runs_per_hour:
             raise HTTPException(status_code=429, detail="hourly run limit reached, try later")

@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     site_host: str = ""
     contact_email: str = ""  # shown on the Privacy and Terms pages
 
+    # Reports each Google account may create; failed runs don't count. Accounts listed in
+    # unlimited_emails (comma-separated) have no limit.
+    free_reports_per_user: int = 5
+    unlimited_emails: str = ""
+
     runs_per_hour: int = 10
     moderation_timeout_s: float = 10.0  # the safety screen must never stall run creation
     max_concurrent_runs: int = 2

@@ -106,6 +106,8 @@ GOOGLE_CLIENT_SECRET=GOCSPX-...
 SESSION_SECRET=<python -c "import secrets; print(secrets.token_urlsafe(32))">
 SITE_HOST=13-201-5-7.nip.io
 RUNS_PER_HOUR=10
+FREE_REPORTS_PER_USER=5
+UNLIMITED_EMAILS=you@gmail.com        # accounts with no report limit, comma-separated
 # image location, so a manual `docker compose up -d` on the instance works too
 # (the deploy workflow sets these itself)
 ECR_REGISTRY=<ACCOUNT_ID>.dkr.ecr.ap-southeast-2.amazonaws.com
