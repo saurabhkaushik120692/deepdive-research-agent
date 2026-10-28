@@ -3,7 +3,21 @@
   <h2>Follow-up questions</h2>
   <p class="muted no-print">Ask for more on anything in this report. DeepDive answers from the report's checked sources first and searches the web when they aren't enough. Every sentence is verified the same way as the report.</p>
 
-  {% for f in fu["items"] %}
+  {% if fu.can_ask %}
+    <form id="followup-form" class="fu-form no-print">
+      <label for="fu-question" class="eyebrow">Ask a follow-up</label>
+      <textarea id="fu-question" name="question" rows="2" minlength="3" maxlength="500" required placeholder="Ask about any point in this report"></textarea>
+      <div class="fu-actions">
+        <small class="muted">{{ fu.left }} of {{ fu.limit }} left</small>
+        <button type="submit">Ask</button>
+      </div>
+      <p class="fu-error" role="alert" hidden></p>
+    </form>
+  {% elif fu.refusal %}
+    <p class="muted no-print">{{ fu.refusal }}</p>
+  {% endif %}
+
+  {% for f in fu["items"] | reverse %}
   <div class="fu-item">
     <p class="fu-q"><span class="eyebrow">You asked</span>{{ f.question }}</p>
     {% if f.status == "answered" %}
@@ -33,18 +47,5 @@
   </div>
   {% endfor %}
 
-  {% if fu.can_ask %}
-    <form id="followup-form" class="fu-form no-print">
-      <label for="fu-question" class="eyebrow">Ask a follow-up</label>
-      <textarea id="fu-question" name="question" rows="2" minlength="3" maxlength="500" required placeholder="e.g. Why did the second cut happen?"></textarea>
-      <div class="fu-actions">
-        <small class="muted">{{ fu.left }} of {{ fu.limit }} left</small>
-        <button type="submit">Ask</button>
-      </div>
-      <p class="fu-error" role="alert" hidden></p>
-    </form>
-  {% elif fu.refusal %}
-    <p class="muted no-print">{{ fu.refusal }}</p>
-  {% endif %}
 </section>
 {% endif %}

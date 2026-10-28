@@ -356,8 +356,9 @@ details#live .three-col { gap: 1.25rem; }
 .sources .url { display: block; word-break: break-all; font-size: 0.75rem; }
 
 /* Follow-up questions under the report. */
-.followups { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--dd-line); }
+.followups { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--dd-line); }
 .followups h2 { margin-top: 0; }
+.followups > .fu-form { margin-bottom: 1rem; }
 .fu-item { border: 1px solid var(--dd-line); border-radius: 14px; padding: 1rem 1.2rem; margin-bottom: 1rem; background: var(--dd-card); }
 .fu-item > p:last-child, .fu-item > .callout:last-child { margin-bottom: 0; }
 .fu-q { font-weight: 600; color: var(--dd-ink); margin-bottom: 0.6rem; }

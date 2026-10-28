@@ -760,3 +760,15 @@ async def test_public_trail_json_unchanged_by_followup_with_web_search(deps, own
     after = public.get(url).json()
     assert after["sources"] == before["sources"]
     assert after["events"] == before["events"]
+
+
+async def test_followups_sit_above_the_report_newest_first(deps, owner):
+    ids = seed_report(deps, user_id=owner.user_id)
+    older = _new_followup(deps, ids, "First question about the cuts?", status="declined")
+    newer = _new_followup(deps, ids, "Second question about the cuts?", status="declined")
+    html = _page(owner, ids["run"])
+    body = html.split('class="report"', 1)[1]
+    assert body.index('id="followups"') < body.index("<h1>")
+    assert body.index('id="followup-form"') < body.index("Second question")
+    assert body.index("Second question") < body.index("First question")
+    assert older < newer
