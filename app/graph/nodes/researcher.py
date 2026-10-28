@@ -24,19 +24,26 @@ async def _page_text(deps: Deps, result: SearchResult) -> str | None:
 
 
 async def research_node(payload: dict, config: RunnableConfig) -> dict:
-    """One researcher per sub-question (fanned out with LangGraph Send)."""
+    """One researcher per sub-question (fanned out with LangGraph Send).
+
+    A follow-up question uses it too (payload has followup_id): it then skips every URL the run
+    already fetched, so the search really adds new evidence, and its events carry followup_id."""
     deps = get_deps(config)
     settings = deps.settings
     run_id, sq_id, round_ = payload["run_id"], payload["sub_question_id"], payload["round"]
+    followup = {"followup_id": payload["followup_id"]} if payload.get("followup_id") else {}
+    seen_scope = (
+        EvidenceChunk.run_id == run_id if followup else EvidenceChunk.sub_question_id == sq_id
+    )
 
-    with node_events(deps, run_id, "researcher", sub_question_id=sq_id, round=round_):
+    with node_events(deps, run_id, "researcher", sub_question_id=sq_id, round=round_, **followup):
         with deps.session_factory() as session:
             query = session.get(SubQuestion, sq_id).query
             seen_urls = set(
                 session.exec(
                     select(Source.url)
                     .join(EvidenceChunk, EvidenceChunk.source_id == Source.id)
-                    .where(EvidenceChunk.sub_question_id == sq_id)
+                    .where(seen_scope)
                 ).all()
             )
 
@@ -66,7 +73,7 @@ async def research_node(payload: dict, config: RunnableConfig) -> dict:
                         run_id,
                         "researcher",
                         "source_skipped",
-                        {"sub_question_id": sq_id, "url": result.url, "reason": reason},
+                        {"sub_question_id": sq_id, "url": result.url, "reason": reason} | followup,
                     )
                     continue
                 source = Source(
@@ -102,8 +109,9 @@ async def research_node(payload: dict, config: RunnableConfig) -> dict:
                 )
             )
             sq = session.get(SubQuestion, sq_id)
-            sq.status = "researched"
-            session.add(sq)
+            if not followup:
+                sq.status = "researched"
+                session.add(sq)
             session.commit()
             log_event(
                 session,
@@ -116,7 +124,8 @@ async def research_node(payload: dict, config: RunnableConfig) -> dict:
                     "query": query,
                     "n_results": len(results),
                     "n_new_chunks": len(new_ids),
-                },
+                }
+                | followup,
             )
 
         await deps.vectors.add(run_id, sq_id, new_ids, new_texts)

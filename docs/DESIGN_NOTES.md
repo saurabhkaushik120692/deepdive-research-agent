@@ -35,6 +35,25 @@ Short notes on the choices that shape DeepDive, and why.
 - Re-research uses a **refined query written from the rejected claims and their reasons**,
   skips URLs already used for that sub-question, and only the thin sub-questions are re-run.
 
+## Follow-up questions
+
+- **A second graph, not a chat prompt.** A follow-up runs scope check → draft → verify → (one web
+  search if thin) → answer, as its own LangGraph graph. A chat model answering from the report text
+  would be fast but unchecked; this keeps every sentence tied to a verified claim.
+- **Reuse before searching.** The run's saved chunks are searched first, and the report's verified
+  claims that cite those chunks can be cited directly instead of being verified again. Verifying a
+  fact twice could give it two different verdicts on one page.
+- **The loop counts only new facts.** The user is asking for more than the report says, so the
+  web search is triggered when fewer than 2 *new* claims are verified, whatever the report holds.
+- **No back door for rejected claims.** A drafted claim matching any report claim (supported or
+  rejected) is dropped, so a follow-up can't bring back something the verifier threw out.
+- **Scope is checked by a model, the limits by code.** Whether a question is on topic needs
+  language understanding; who may ask (the report's owner, not on examples, within 30 days, 10 per
+  report, one at a time) is plain code. Off-topic questions cost one cheap call.
+- **Fast enough to feel conversational.** The scope check, follow-up drafting and answer use low
+  reasoning effort; the verifier keeps its default. Follow-up rows carry a `followup_id`, and every
+  report query filters on it, so the report, its counts and its trail never change afterwards.
+
 ## Architecture
 
 - **Thin graph state, database as the source of truth.** LangGraph state carries ids only;

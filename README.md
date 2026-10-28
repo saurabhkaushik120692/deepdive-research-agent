@@ -50,6 +50,33 @@ The **coordinator** is the LangGraph `StateGraph` in [`app/graph/build.py`](app/
 Graph state carries only ids and counters; sources, chunks, claims, verdicts and events live in
 SQLite, and embeddings live in Chroma.
 
+### Follow-up questions reuse the research
+
+Under a finished report, its owner can ask follow-up questions (up to 10 per report, for 30 days).
+They run through a second, smaller LangGraph graph with its own loop
+([`app/graph/followup.py`](app/graph/followup.py)):
+
+```mermaid
+flowchart TD
+    A[Follow-up question] --> SC[Scope check<br/>on topic? rewrite to stand alone]
+    SC -->|off topic| X[Declined with the reason]
+    SC -->|on topic| D2[Drafter<br/>new claims from the report's saved evidence]
+    D2 --> V2[Verifier + quote check<br/>same as the report]
+    V2 --> L2{At least 2 new<br/>verified facts?}
+    L2 -->|no, once| W[Researcher<br/>new web search for this question]
+    W --> D2
+    L2 -->|yes, or already searched| AN[Answer<br/>from verified claims only]
+```
+
+- **Reuses the earlier research.** It searches the chunks the report already collected, and the
+  report's verified claims can be cited as they are, so one fact never gets two verdicts.
+- **Searches again only when needed.** If the saved evidence gives fewer than 2 new verified facts,
+  one web search runs for this question, then the new evidence is drafted and verified.
+- **Same guarantees as the report.** Claims the report rejected can't come back; answer paragraphs
+  that cite anything unverified or state a figure their claims don't contain are dropped.
+- **Stays on topic.** A scope check declines questions about another subject and suggests a new
+  report. Follow-ups never change the report itself; they have their own section in the audit trail.
+
 ## What makes the verification trustworthy
 
 1. **Quote check in code** ([`app/tools/quote_match.py`](app/tools/quote_match.py)). The
@@ -163,7 +190,8 @@ Design decisions and trade-offs: [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md).
 
 ## Known limitations
 
-- Single instance: runs execute as in-process background tasks (max 2 at once); no job queue.
+- Single instance: runs and follow-ups execute as in-process background tasks (max 2 at once);
+  no job queue.
 - Search depends on Tavily's raw page content, falling back to direct fetching. PDFs and
   paywalled pages are skipped, not read.
 - Claims are verified; the synthesizer's wording is only checked for citations and figures, so a

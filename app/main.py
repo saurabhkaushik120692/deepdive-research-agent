@@ -5,9 +5,10 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.api import admin, auth, pages, runs
+from app.api import admin, auth, followups, pages, runs
 from app.config import Settings, get_settings
 from app.deps import Deps, build_deps
+from app.graph.followup import fail_interrupted_followups
 from app.graph.runner import fail_interrupted_runs
 
 
@@ -15,6 +16,7 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
     settings = settings or get_settings()
     deps = deps or build_deps(settings)
     fail_interrupted_runs(deps)  # in-process runs don't survive a restart or redeploy
+    fail_interrupted_followups(deps)
 
     app = FastAPI(title="DeepDive Research Agent", version="0.1.0")
     app.state.settings = settings
@@ -37,6 +39,7 @@ def create_app(settings: Settings | None = None, deps: Deps | None = None) -> Fa
 
     app.include_router(auth.router)
     app.include_router(runs.router)
+    app.include_router(followups.router)
     app.include_router(pages.router)
     app.include_router(admin.router)
     app.add_exception_handler(pages.SignInRequired, pages.sign_in_redirect)

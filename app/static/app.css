@@ -355,6 +355,27 @@ details#live .three-col { gap: 1.25rem; }
 .sources li { margin-bottom: 0.35rem; }
 .sources .url { display: block; word-break: break-all; font-size: 0.75rem; }
 
+/* Follow-up questions under the report. */
+.followups { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--dd-line); }
+.followups h2 { margin-top: 0; }
+.fu-item { border: 1px solid var(--dd-line); border-radius: 14px; padding: 1rem 1.2rem; margin-bottom: 1rem; background: var(--dd-card); }
+.fu-item > p:last-child, .fu-item > .callout:last-child { margin-bottom: 0; }
+.fu-q { font-weight: 600; color: var(--dd-ink); margin-bottom: 0.6rem; }
+.fu-q .eyebrow { display: block; margin-bottom: 0.15rem; }
+.fu-sources { font-size: 0.85rem; margin: 0.5rem 0 0; }
+.fu-note { font-size: 0.8rem; color: var(--dd-teal); margin: 0.4rem 0 0; }
+.fu-note::before { content: "↻ "; }
+.callout.bad { background: var(--dd-bad-bg); color: #fecaca; }
+.fu-pending { display: flex; align-items: center; gap: 0.6rem; color: var(--dd-muted); margin: 0; }
+.fu-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--dd-line-strong); border-top-color: var(--dd-accent); animation: spin 0.9s linear infinite; flex: none; }
+.fu-form { border: 1px solid rgba(122, 166, 255, 0.35); border-radius: 14px; padding: 0.9rem 1rem 0.75rem; background: linear-gradient(135deg, rgba(79, 107, 255, 0.08), rgba(168, 85, 247, 0.06)); }
+.fu-form .eyebrow { display: block; margin-bottom: 0.4rem; }
+.fu-form textarea { resize: vertical; margin-bottom: 0.5rem; }
+.fu-actions { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.fu-actions button { width: auto; margin: 0; padding: 0.45rem 1.4rem; }
+.fu-error { color: var(--dd-bad); font-size: 0.88rem; margin: 0.5rem 0 0; }
+.fu-trail { padding: 0.9rem 1rem; margin-bottom: 0.9rem; }
+
 /* Citation popover: hover or keyboard focus shows the exact quote the verifier found. */
 .cite-wrap { position: relative; }
 a.cite { text-decoration: none; font-size: 0.75em; vertical-align: super; font-weight: 600; padding: 0 0.15em; color: var(--dd-teal); }

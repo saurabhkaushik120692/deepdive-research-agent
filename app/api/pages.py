@@ -11,6 +11,8 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
 from app.api.auth import admin_user, can_view, session_user
+from app.api.followup_views import followup_trail, followups_view, paragraph_view
+from app.api.followups import NOT_YOURS, followup_refusal, followups_left
 from app.api.quota import quota_for, start_refusal
 from app.deps import Deps
 from app.graph.schemas import Conflict, SynthesisOutput
@@ -160,7 +162,7 @@ def _verdict_samples(session, run_id: str, pick=random.choice) -> list[dict]:
         rows = session.exec(
             select(Claim, Verdict)
             .join(Verdict, Verdict.claim_id == Claim.id)
-            .where(Claim.run_id == run_id, Verdict.label == label)
+            .where(Claim.run_id == run_id, Claim.followup_id.is_(None), Verdict.label == label)
             .order_by(Claim.id)
         ).all()
         if not rows:
@@ -179,9 +181,32 @@ def run_page(run_id: str, request: Request):
     with _deps(request).session_factory() as session:
         run = _visible_run(session, run_id, request)
         view = _report_view(session, run) if run.status == "completed" else None
+        fu = _followup_context(session, run, request)
     return templates.TemplateResponse(
-        request, "run.html", {"run": run, "view": view, "duration": duration(run)}
+        request, "run.html", {"run": run, "view": view, "fu": fu, "duration": duration(run)}
     )
+
+
+def _followup_context(session, run: Run, request: Request) -> dict | None:
+    """The follow-up section of a finished report, for its owner (and the admin). None hides
+    it: other visitors, unfinished runs, and examples that never had follow-ups."""
+    user = session_user(request)
+    owner = user is not None and run.user_id == user["id"]
+    if run.status != "completed" or not (owner or admin_user(request) is not None):
+        return None
+    settings = _deps(request).settings
+    items = followups_view(session, run)
+    refusal = followup_refusal(session, run, user, settings)
+    if not items and refusal == NOT_YOURS:
+        return None
+    busy = any(i["status"] in ("queued", "running") for i in items)
+    return {
+        "items": items,
+        "can_ask": refusal is None and not busy,
+        "refusal": refusal if refusal != NOT_YOURS else None,
+        "left": followups_left(session, run.id, settings),
+        "limit": settings.followups_per_report,
+    }
 
 
 def _report_view(session, run: Run) -> dict | None:
@@ -189,7 +214,12 @@ def _report_view(session, run: Run) -> dict | None:
     if report is None or not report.synthesis:
         return None
     synthesis = SynthesisOutput.model_validate(report.synthesis)
-    claims = {c.id: c for c in session.exec(select(Claim).where(Claim.run_id == run.id)).all()}
+    claims = {
+        c.id: c
+        for c in session.exec(
+            select(Claim).where(Claim.run_id == run.id, Claim.followup_id.is_(None))
+        ).all()
+    }
     verdicts = {
         v.claim_id: v
         for v in session.exec(select(Verdict).where(Verdict.claim_id.in_(list(claims)))).all()
@@ -205,31 +235,23 @@ def _report_view(session, run: Run) -> dict | None:
     citations = Citations(claims, chunk_sources)
     sections = []
     for section in synthesis.sections:
-        paragraphs = []
-        for p in section.paragraphs:
-            cites = [
-                {
-                    "n": n,
-                    "url": src.url,
-                    "domain": src.domain,
-                    "tier": src.tier,
-                    "quote": verdicts[cid].quote if cid in verdicts else "",
-                }
-                for cid in p.claim_ids
-                for n, src in citations.sources_for(cid)
-            ]
-            partial = any(
-                verdicts[cid].label == "partial" for cid in p.claim_ids if cid in verdicts
-            )
-            paragraphs.append({"text": p.text, "cites": cites, "partial": partial})
+        paragraphs = [
+            paragraph_view(p.text, p.claim_ids, citations, verdicts) for p in section.paragraphs
+        ]
         sections.append({"heading": section.heading, "paragraphs": paragraphs})
 
     thin = session.exec(
-        select(SubQuestion.text).where(SubQuestion.run_id == run.id, SubQuestion.status == "thin")
+        select(SubQuestion.text).where(
+            SubQuestion.run_id == run.id,
+            SubQuestion.followup_id.is_(None),
+            SubQuestion.status == "thin",
+        )
     ).all()
     conflicts = []
     for e in session.exec(
-        select(Event).where(Event.run_id == run.id, Event.type == "conflict_found")
+        select(Event).where(
+            Event.run_id == run.id, Event.followup_id.is_(None), Event.type == "conflict_found"
+        )
     ).all():
         c = Conflict(**e.payload)
         if c.claim_a in claims and c.claim_b in claims:
@@ -270,8 +292,20 @@ def report_page(run_id: str, request: Request, fragment: bool = False):
     with _deps(request).session_factory() as session:
         run = _visible_run(session, run_id, request)
         view = _report_view(session, run)
+        fu = _followup_context(session, run, request)
     template = "_report_body.html" if fragment else "report.html"
-    return templates.TemplateResponse(request, template, {"run": run, "view": view})
+    return templates.TemplateResponse(request, template, {"run": run, "view": view, "fu": fu})
+
+
+@router.get("/runs/{run_id}/followups", response_class=HTMLResponse)
+def followups_fragment(run_id: str, request: Request):
+    """The follow-up section alone, re-rendered by the page's script after a follow-up ends."""
+    with _deps(request).session_factory() as session:
+        run = _visible_run(session, run_id, request)
+        fu = _followup_context(session, run, request)
+    if fu is None:
+        raise HTTPException(status_code=404, detail="no follow-ups here")
+    return templates.TemplateResponse(request, "_followups.html", {"run": run, "fu": fu})
 
 
 @router.get("/runs/{run_id}/trail", response_class=HTMLResponse)
@@ -279,7 +313,9 @@ def trail_page(run_id: str, request: Request):
     with _deps(request).session_factory() as session:
         run = _visible_run(session, run_id, request)
         sqs = session.exec(
-            select(SubQuestion).where(SubQuestion.run_id == run_id).order_by(SubQuestion.id)
+            select(SubQuestion)
+            .where(SubQuestion.run_id == run_id, SubQuestion.followup_id.is_(None))
+            .order_by(SubQuestion.id)
         ).all()
         searches = session.exec(
             select(SearchRecord)
@@ -289,16 +325,27 @@ def trail_page(run_id: str, request: Request):
         claims = session.exec(
             select(Claim, Verdict)
             .outerjoin(Verdict, Verdict.claim_id == Claim.id)
-            .where(Claim.run_id == run_id)
+            .where(Claim.run_id == run_id, Claim.followup_id.is_(None))
             .order_by(Claim.id)
         ).all()
         events = session.exec(
-            select(Event).where(Event.run_id == run_id, Event.type != "llm_call").order_by(Event.id)
+            select(Event)
+            .where(Event.run_id == run_id, Event.followup_id.is_(None), Event.type != "llm_call")
+            .order_by(Event.id)
         ).all()
+        owner_or_admin = _followup_context(session, run, request) is not None
+        followups = followup_trail(session, run_id) if owner_or_admin else []
     return templates.TemplateResponse(
         request,
         "trail.html",
-        {"run": run, "sqs": sqs, "searches": searches, "claims": claims, "events": events},
+        {
+            "run": run,
+            "sqs": sqs,
+            "searches": searches,
+            "claims": claims,
+            "events": events,
+            "followups": followups,
+        },
     )
 
 

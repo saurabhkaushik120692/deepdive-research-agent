@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     model_judge: str = "google/gemini-2.5-flash-lite"
     model_embed: str = "google/embeddinggemma-300m"
     model_moderation: str = "openai/omni-moderation-latest"
+    # Follow-up questions under a report: an on-topic check, drafting and the answer.
+    model_scope: str = "openai/gpt-5-nano"
+    model_followup_drafter: str = "openai/gpt-5-nano"
+    model_followup_answer: str = "openai/gpt-5-nano"
 
     min_supported_claims: int = 2
     max_extra_rounds: int = 2
@@ -49,6 +53,10 @@ class Settings(BaseSettings):
     # At the default effort the report writer thinks ~7,000 hidden tokens (about 2 min, sometimes
     # past the timeout); "low" writes comparable reports in 20-45 s. Empty = model default.
     reasoning_effort_synthesizer: str = "low"
+    # Follow-ups should answer in about a minute; the verifier keeps its default effort.
+    reasoning_effort_scope: str = "low"
+    reasoning_effort_followup_drafter: str = "low"
+    reasoning_effort_followup_answer: str = "low"
 
     # Google sign-in. site_host is the public hostname (the deploy sets it for Caddy too):
     # when set, sign-in returns to https://<site_host>/ and the session cookie is HTTPS-only.
@@ -63,17 +71,24 @@ class Settings(BaseSettings):
     free_reports_per_user: int = 5
     unlimited_emails: str = ""
 
+    # Follow-up questions: only on the owner's own reports, closed after followup_max_age_days.
+    followups_per_report: int = 10
+    followup_max_age_days: int = 30
+
     runs_per_hour: int = 10
     moderation_timeout_s: float = 10.0  # the safety screen must never stall run creation
     max_concurrent_runs: int = 2
 
     @model_validator(mode="after")
     def _verifier_family_differs(self) -> "Settings":
-        if self.model_drafter.split("/")[0] == self.model_verifier.split("/")[0]:
-            raise ValueError(
-                "model_verifier must be from a different model family than model_drafter "
-                f"(got {self.model_drafter!r} and {self.model_verifier!r})"
-            )
+        verifier_family = self.model_verifier.split("/")[0]
+        for name in ("model_drafter", "model_followup_drafter"):
+            drafter = getattr(self, name)
+            if drafter.split("/")[0] == verifier_family:
+                raise ValueError(
+                    f"model_verifier must be from a different model family than {name} "
+                    f"(got {drafter!r} and {self.model_verifier!r})"
+                )
         return self
 
 

@@ -14,7 +14,17 @@ from pydantic import BaseModel, ValidationError
 
 from app.config import Settings
 
-Role = Literal["planner", "drafter", "verifier", "synthesizer", "judge", "contradictions"]
+Role = Literal[
+    "planner",
+    "drafter",
+    "verifier",
+    "synthesizer",
+    "judge",
+    "contradictions",
+    "scope",
+    "followup_drafter",
+    "followup_answer",
+]
 T = TypeVar("T", bound=BaseModel)
 UsageCallback = Callable[[str | None, dict], None]
 

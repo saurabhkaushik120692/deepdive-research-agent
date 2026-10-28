@@ -34,6 +34,13 @@ class ChromaStore:
 
     async def query(self, run_id: str, sub_question_id: int, text: str, k: int) -> list[int]:
         where = {"$and": [{"run_id": run_id}, {"sub_question_id": sub_question_id}]}
+        return await self._nearest(where, text, k)
+
+    async def query_run(self, run_id: str, text: str, k: int) -> list[int]:
+        """Nearest chunks across every sub-question of a run (follow-ups reuse all of it)."""
+        return await self._nearest({"run_id": run_id}, text, k)
+
+    async def _nearest(self, where: dict, text: str, k: int) -> list[int]:
         n = await asyncio.to_thread(lambda: len(self.collection.get(where=where)["ids"]))
         if n == 0:
             return []

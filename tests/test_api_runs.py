@@ -124,7 +124,15 @@ def test_unknown_run_is_404(client):
 
 def test_trail_shape(client, finished_run_with_events):
     t = client.get(f"/api/runs/{finished_run_with_events}/trail").json()
-    assert set(t) == {"run", "sub_questions", "searches", "sources", "claims", "events"}
+    assert set(t) == {
+        "run",
+        "sub_questions",
+        "searches",
+        "sources",
+        "claims",
+        "events",
+        "followups",
+    }
     assert t["run"]["id"] == finished_run_with_events and len(t["events"]) == 2
 
 

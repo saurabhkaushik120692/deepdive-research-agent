@@ -130,3 +130,7 @@ class MemoryVectors:
 
     async def query(self, run_id, sub_question_id, text, k):
         return self.store.get((run_id, sub_question_id), [])[:k]
+
+    async def query_run(self, run_id, text, k):
+        ids = [i for (r, _), chunk_ids in self.store.items() if r == run_id for i in chunk_ids]
+        return ids[:k]

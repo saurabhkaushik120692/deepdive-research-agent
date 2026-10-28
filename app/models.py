@@ -53,7 +53,8 @@ class SubQuestion(SQLModel, table=True):
     text: str
     query: str
     round: int = 0
-    status: str = "pending"  # pending | researched | thin | ok
+    status: str = "pending"  # pending | researched | thin | ok | followup
+    followup_id: int | None = Field(default=None, index=True)  # set: belongs to a follow-up
 
 
 class SearchRecord(SQLModel, table=True):
@@ -92,6 +93,7 @@ class Claim(SQLModel, table=True):
     chunk_ids: list[int] = Field(default_factory=list, sa_column=Column(JSON))
     round: int = 0
     in_draft: bool = True
+    followup_id: int | None = Field(default=None, index=True)  # set: drafted for a follow-up
 
 
 class Verdict(SQLModel, table=True):
@@ -111,6 +113,7 @@ class Event(SQLModel, table=True):
     type: str
     ts: datetime = Field(default_factory=_now)
     payload: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    followup_id: int | None = Field(default=None, index=True)  # set: logged by a follow-up
 
 
 class Report(SQLModel, table=True):
@@ -119,6 +122,25 @@ class Report(SQLModel, table=True):
     metrics: dict = Field(default_factory=dict, sa_column=Column(JSON))
     # Final (filtered) SynthesisOutput, so the HTML view can link each citation to its quote.
     synthesis: dict = Field(default_factory=dict, sa_column=Column(JSON))
+
+
+class FollowUp(SQLModel, table=True):
+    """A question asked under a finished report, answered from verified claims only."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    run_id: str = Field(foreign_key="run.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    question: str
+    standalone_question: str = ""  # the question rewritten to make sense on its own
+    status: str = "queued"  # queued | running | answered | declined | failed
+    stage: str = "waiting"  # waiting | scope | drafting | searching | writing
+    decline_reason: str = ""
+    searched_web: bool = False
+    # {"paragraphs": [{"text", "claim_ids"}], "none_found": bool}
+    answer: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    error: str | None = None
+    created_at: datetime = Field(default_factory=_now)
+    finished_at: datetime | None = None
 
 
 class CacheEntry(SQLModel, table=True):

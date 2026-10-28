@@ -60,6 +60,17 @@ class ContradictionOutput(BaseModel):
     conflicts: list[Conflict]
 
 
+class ScopeOutput(BaseModel):
+    in_scope: bool
+    reason: str
+    standalone_question: str = ""
+    search_query: str = ""
+
+
+class FollowUpAnswer(BaseModel):
+    paragraphs: list[Paragraph]
+
+
 class JudgeOutput(BaseModel):
     supported: bool
     reason: str

@@ -1,0 +1,50 @@
+{% if fu %}
+<section id="followups" class="followups" data-run="{{ run.id }}">
+  <h2>Follow-up questions</h2>
+  <p class="muted no-print">Ask for more on anything in this report. DeepDive answers from the report's checked sources first and searches the web when they aren't enough. Every sentence is verified the same way as the report.</p>
+
+  {% for f in fu["items"] %}
+  <div class="fu-item">
+    <p class="fu-q"><span class="eyebrow">You asked</span>{{ f.question }}</p>
+    {% if f.status == "answered" %}
+      {% if f.none_found %}
+        <p class="muted">DeepDive couldn't find sources that support an answer to this question.</p>
+      {% else %}
+        {% for p in f.paragraphs %}
+          <p>{{ p.text }}
+            {%- for c in p.cites %} <span class="cite-wrap"><a class="cite" href="{{ c.url }}" target="_blank" rel="noopener">[{{ c.n }}]</a><span class="cite-pop" role="tooltip"><b>[{{ c.n }}] {{ c.domain }} <span class="pt">· {{ tier_labels.get(c.tier, "other") }}</span></b>{% if c.quote %}<q>{{ c.quote }}</q>{% else %}No quote recorded for this claim.{% endif %}</span></span>{% endfor %}
+            {%- if p.partial %} <span class="badge warn">⚠ partially verified</span>{% endif %}
+          </p>
+        {% endfor %}
+        {% if f.sources %}
+          <ol class="sources fu-sources">
+            {% for n, s in f.sources %}<li value="{{ n }}"><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.title or s.domain }}</a> <span class="badge tier-{{ s.tier }}">tier {{ s.tier }} · {{ tier_labels.get(s.tier, "other") }}</span></li>{% endfor %}
+          </ol>
+        {% endif %}
+      {% endif %}
+      {% if f.searched_web %}<p class="fu-note">Searched the web for more evidence</p>{% endif %}
+    {% elif f.status == "declined" %}
+      <div class="callout warn">{{ f.decline_reason }} <a href="/">Start a new report</a></div>
+    {% elif f.status == "failed" %}
+      <div class="callout bad">Something went wrong, try again. This one doesn't count toward your follow-ups.</div>
+    {% else %}
+      <p class="fu-pending" data-followup="{{ f.id }}"><span class="fu-spin" aria-hidden="true"></span> <span class="fu-stage">{{ f.stage_label }}</span></p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% if fu.can_ask %}
+    <form id="followup-form" class="fu-form no-print">
+      <label for="fu-question" class="eyebrow">Ask a follow-up</label>
+      <textarea id="fu-question" name="question" rows="2" minlength="3" maxlength="500" required placeholder="e.g. Why did the second cut happen?"></textarea>
+      <div class="fu-actions">
+        <small class="muted">{{ fu.left }} of {{ fu.limit }} left</small>
+        <button type="submit">Ask</button>
+      </div>
+      <p class="fu-error" role="alert" hidden></p>
+    </form>
+  {% elif fu.refusal %}
+    <p class="muted no-print">{{ fu.refusal }}</p>
+  {% endif %}
+</section>
+{% endif %}

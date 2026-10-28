@@ -29,6 +29,9 @@ _ADDED_COLUMNS = {
         "blocked": "BOOLEAN NOT NULL DEFAULT 0",
         "quota_reset_at": "DATETIME",
     },
+    "subquestion": {"followup_id": "INTEGER"},
+    "claim": {"followup_id": "INTEGER"},
+    "event": {"followup_id": "INTEGER"},
 }
 
 

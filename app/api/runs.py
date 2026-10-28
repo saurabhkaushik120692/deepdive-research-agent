@@ -10,10 +10,21 @@ from sqlmodel import func, select
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.auth import admin_user, can_view, require_user, session_user
+from app.api.followup_views import followup_trail
 from app.api.quota import quota_for, start_refusal
 from app.deps import Deps
 from app.graph.runner import create_run, run_research
-from app.models import Claim, Event, Report, Run, SearchRecord, Source, SubQuestion, Verdict
+from app.models import (
+    Claim,
+    Event,
+    EvidenceChunk,
+    Report,
+    Run,
+    SearchRecord,
+    Source,
+    SubQuestion,
+    Verdict,
+)
 
 router = APIRouter(prefix="/api")
 POLL_SECONDS = 0.5
@@ -97,33 +108,57 @@ def get_trail(run_id: str, request: Request) -> dict:
     with _deps(request).session_factory() as session:
         run = _get_run_or_404(session, run_id, request)
         sqs = session.exec(
-            select(SubQuestion).where(SubQuestion.run_id == run_id).order_by(SubQuestion.id)
+            select(SubQuestion)
+            .where(SubQuestion.run_id == run_id, SubQuestion.followup_id.is_(None))
+            .order_by(SubQuestion.id)
         ).all()
         searches = session.exec(
             select(SearchRecord)
             .where(SearchRecord.sub_question_id.in_([q.id for q in sqs]))
             .order_by(SearchRecord.id)
         ).all()
-        sources = session.exec(select(Source).where(Source.run_id == run_id)).all()
+        # The report's sources only: a follow-up's web search adds sources to the run too.
+        sources = session.exec(
+            select(Source)
+            .join(EvidenceChunk, EvidenceChunk.source_id == Source.id)
+            .where(EvidenceChunk.sub_question_id.in_([q.id for q in sqs]))
+            .distinct()
+            .order_by(Source.id)
+        ).all()
         rows = session.exec(
             select(Claim, Verdict)
             .outerjoin(Verdict, Verdict.claim_id == Claim.id)
-            .where(Claim.run_id == run_id)
+            .where(Claim.run_id == run_id, Claim.followup_id.is_(None))
             .order_by(Claim.id)
         ).all()
-        events = session.exec(select(Event).where(Event.run_id == run_id).order_by(Event.id)).all()
+        events = session.exec(
+            select(Event)
+            .where(Event.run_id == run_id, Event.followup_id.is_(None))
+            .order_by(Event.id)
+        ).all()
+        # Follow-ups are private to the report's owner (and the admin), even on an example.
+        user = session_user(request)
+        owner = user is not None and run.user_id == user["id"]
+        followups = [
+            {**f, "claims": [_claim_json(c, v) for c, v in f["claims"]]}
+            for f in followup_trail(session, run_id)
+            if owner or admin_user(request) is not None
+        ]
         return jsonable_encoder(
             {
                 "run": run,
                 "sub_questions": sqs,
                 "searches": searches,
                 "sources": sources,
-                "claims": [
-                    {**c.model_dump(), "verdict": v.model_dump() if v else None} for c, v in rows
-                ],
+                "claims": [_claim_json(c, v) for c, v in rows],
                 "events": events,
+                "followups": followups,
             }
         )
+
+
+def _claim_json(claim: Claim, verdict: Verdict | None) -> dict:
+    return {**claim.model_dump(), "verdict": verdict.model_dump() if verdict else None}
 
 
 def _claim_texts(session, events: list[Event]) -> dict[int, str]:
@@ -155,7 +190,7 @@ async def stream_events(run_id: str, request: Request):
             with deps.session_factory() as session:
                 new = session.exec(
                     select(Event)
-                    .where(Event.run_id == run_id, Event.id > last_id)
+                    .where(Event.run_id == run_id, Event.followup_id.is_(None), Event.id > last_id)
                     .order_by(Event.id)
                 ).all()
                 status = session.get(Run, run_id).status

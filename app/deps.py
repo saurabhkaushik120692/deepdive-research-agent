@@ -32,6 +32,8 @@ class VectorStore(Protocol):
 
     async def query(self, run_id: str, sub_question_id: int, text: str, k: int) -> list[int]: ...
 
+    async def query_run(self, run_id: str, text: str, k: int) -> list[int]: ...
+
 
 @dataclass
 class Deps:

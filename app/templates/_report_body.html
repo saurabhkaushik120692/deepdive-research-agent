@@ -12,6 +12,7 @@
       {% if view.conflicts %}<li><a href="#conflicts" class="warn">Conflicting sources <span>{{ view.conflicts | length }}</span></a></li>{% endif %}
       <li><a href="#rejected" class="bad">Rejected claims <span>{{ view.rejected | length }}</span></a></li>
       <li><a href="#sources">Sources <span>{{ view.sources | length }}</span></a></li>
+      {% if fu %}<li><a href="#followups">Follow-up questions{% if fu["items"] %} <span>{{ fu["items"] | length }}</span>{% endif %}</a></li>{% endif %}
     </ul>
   </nav>
 
@@ -63,6 +64,8 @@
           <span class="badge tier-{{ s.tier }}">tier {{ s.tier }} · {{ tier_labels.get(s.tier, "other") }}</span> <small class="muted url">{{ s.url }}</small></li>
       {% endfor %}
     </ol>
+
+    {% include "_followups.html" %}
   </article>
 
   <aside class="report-side no-print">

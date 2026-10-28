@@ -40,6 +40,32 @@
   </tbody>
 </table></div>
 
+{% if followups %}
+<h3 id="followups">Follow-ups</h3>
+<p class="muted"><small>Questions asked under the report. They have their own claims and checks and never change the report above.</small></p>
+{% for t in followups %}
+  {% set f = t.followup %}
+  <div class="table-card fu-trail">
+    <p><b>#{{ f.id }}</b> {{ f.question }} <span class="pill status-{{ f.status }}">{{ f.status }}</span>{% if f.searched_web %} <span class="badge">searched the web</span>{% endif %}</p>
+    {% if f.standalone_question and f.standalone_question != f.question %}<p class="muted"><small>Understood as: {{ f.standalone_question }}</small></p>{% endif %}
+    {% if f.decline_reason %}<p class="muted"><small>Declined: {{ f.decline_reason }}</small></p>{% endif %}
+    {% if f.error %}<p class="bad"><small>Error: {{ f.error }}</small></p>{% endif %}
+    {% for s in t.searches %}<p><small>Search: <code>{{ s.query }}</code> · {{ s.n_results }} results</small></p>{% endfor %}
+    {% if t.claims %}
+    <div class="overflow-auto"><table>
+      <thead><tr><th>#</th><th>Claim</th><th>Verdict</th><th>Reason</th><th>Quote</th></tr></thead>
+      <tbody>{% for c, v in t.claims %}<tr><td>{{ c.id }}</td><td>{{ c.text }}</td>
+        <td>{% if v %}<span class="badge {{ 'good' if v.label == 'supported' else 'warn' if v.label == 'partial' else 'bad' }}">{{ v.label }}</span>{% else %}pending{% endif %}</td>
+        <td><small>{{ v.reason if v else '' }}</small></td><td><small>{{ v.quote if v else '' }}</small></td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+    <details><summary><small>Events ({{ t.events | length }})</small></summary>
+      <div class="overflow-auto"><table class="events"><tbody>{% for e in t.events %}<tr><td><small>{{ e.ts.strftime("%H:%M:%S") }}</small></td><td>{{ e.node }}</td><td>{{ e.type }}</td><td><small><code>{{ e.payload | tojson }}</code></small></td></tr>{% endfor %}</tbody></table></div>
+    </details>
+  </div>
+{% endfor %}
+{% endif %}
+
 <h3>Events</h3>
 <div class="table-card overflow-auto"><table class="events">
   <thead><tr><th>Time (UTC)</th><th>Node</th><th>Event</th><th>Details</th></tr></thead>
