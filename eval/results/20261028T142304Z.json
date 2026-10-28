@@ -1,0 +1,113 @@
+{
+  "generated_at": "2026-10-28 04:34 UTC",
+  "n_questions": 24,
+  "models": {
+    "planner": "openai/gpt-5-nano",
+    "drafter": "openai/gpt-5-nano",
+    "verifier": "anthropic/claude-haiku-5.5",
+    "synthesizer": "openai/gpt-5-nano",
+    "contradictions": "openai/gpt-5-nano",
+    "embed": "google/embeddinggemma-300m",
+    "judge": "google/gemini-2.5-flash-lite"
+  },
+  "runs": {
+    "total": 24,
+    "completed": 24,
+    "failed": 0,
+    "failed_ids": []
+  },
+  "claims": {
+    "drafted": 1455,
+    "supported": 1201,
+    "partial": 149,
+    "unsupported": 105,
+    "draft_supported_rate": 0.8254295532646048,
+    "draft_rejected_rate": 0.07216494845360824,
+    "report_paragraphs_dropped": 17
+  },
+  "loops": {
+    "runs_with_loop_rate": 0.20833333333333334,
+    "mean_extra_rounds": 0.2916666666666667
+  },
+  "coverage": {
+    "sub_questions": 112,
+    "ok_rate": 0.9910714285714286
+  },
+  "quote_validity_rate": 0.9926470588235294,
+  "cost": {
+    "per_run_usd": {
+      "mean": 0.039800050000000003,
+      "p50": 0.04166605000000001,
+      "p95": 0.0591058975
+    },
+    "total_usd": 0.9552012000000001,
+    "unpriced_runs": 0
+  },
+  "latency_s": {
+    "mean": 247.23945208333333,
+    "p50": 250.7124495,
+    "p95": 353.06813354999997
+  },
+  "tokens": {
+    "prompt": 2948844,
+    "completion": 1639120
+  },
+  "verifier_probe": {
+    "n_originals": 60,
+    "errors": 1,
+    "wrongful_rejection_rate": 0.0,
+    "n_mutants": 53,
+    "catch_rate": 0.9622641509433962,
+    "catch_rate_by_kind": {
+      "entity": 0.8333333333333334,
+      "negation": 1.0,
+      "number": 1.0,
+      "year": 1.0
+    },
+    "n_mutants_by_kind": {
+      "entity": 12,
+      "negation": 19,
+      "number": 12,
+      "year": 10
+    },
+    "examples": [
+      {
+        "kind": "year",
+        "mutant": "The People\u2019s Bank of China continues its gold accumulation strategy, adding to reserves for eighteen consecutive months as of January 2023.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "negation",
+        "mutant": "The antibiotic consumption rate across these countries decreased 10.6% from 13.7 to 15.2 DDDs per 1,000 inhabitants per day.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "negation",
+        "mutant": "There were not an estimated 4.95 million deaths associated with bacterial AMR in 2019.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "negation",
+        "mutant": "EV battery testing market is not defined as a systematic evaluation of electric vehicle batteries to ensure their safety, performance, reliability, and compliance with industry standards, including assessing battery capacity, charging efficiency, thermal stability, lifecycle durability, and response under varying environmental and operational conditions.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "number",
+        "mutant": "Post-monsoon PM2.5 declined by 6.24 \u00b1 1.59 \u00b5g/m3/y between 2011 and 2021.",
+        "label": "unsupported"
+      }
+    ]
+  },
+  "independent_judge": {
+    "model": "google/gemini-2.5-flash-lite",
+    "n": 100,
+    "errors": 0,
+    "groundedness": 0.95
+  },
+  "gold": {
+    "n_labelled": 50,
+    "accuracy": 0.86,
+    "kappa": 0.7028862478777589
+  },
+  "eval_cost_usd": 0.04722934999999996
+}

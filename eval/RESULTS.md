@@ -1,18 +1,18 @@
 # DeepDive self-evaluation results
 
-Generated 2026-10-21 16:48 UTC on 24 questions from `eval/questions.jsonl`.
+Generated 2026-10-28 04:34 UTC on 24 questions from `eval/questions.jsonl`.
 
 | Metric | Value |
 |---|---|
 | Runs completed | 24 / 24 |
-| Verifier catch rate (planted false claims) | 94.5% of 55 |
-|   · catch rate: entity | 76.9% of 13 |
+| Verifier catch rate (planted false claims) | 96.2% of 53 |
+|   · catch rate: entity | 83.3% of 12 |
 |   · catch rate: negation | 100.0% of 19 |
 |   · catch rate: number | 100.0% of 12 |
-|   · catch rate: year | 100.0% of 11 |
+|   · catch rate: year | 100.0% of 10 |
 | Wrongful rejection rate (re-verified supported claims) | 0.0% of 60 |
-| Probe / judge calls that errored (excluded from the rates above) | 0 / 0 |
-| Independent groundedness (judge: google/gemini-2.5-flash-lite) | 94.0% of 100 |
+| Probe / judge calls that errored (excluded from the rates above) | 1 / 0 |
+| Independent groundedness (judge: google/gemini-2.5-flash-lite) | 95.0% of 100 |
 | Agreement with hand labels (accuracy) | 86.0% of 50 |
 | Agreement with hand labels (Cohen's kappa) | 0.70 |
 | Quote validity rate | 99.3% |

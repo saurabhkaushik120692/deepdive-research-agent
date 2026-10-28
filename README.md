@@ -10,14 +10,15 @@ often doesn't say what the sentence claims. DeepDive's focus is making the citat
 
 **Measured on 24 research questions, two full runs** ([full results](eval/RESULTS.md)):
 
-| | Latest run | Previous run |
-|---|---|---|
-| Planted false claims caught by the verifier | **94.5%** of 55 | 87.0% of 54 |
-| True claims wrongly rejected | **0.0%** of 60 | 0.0% of 60 |
-| Report claims judged grounded by an independent model | **94.0%** of 100 | 94.0% of 100 |
-| Agreement with 50 hand-labelled claims | **86.0%** (Cohen's κ 0.70) | same labels |
-| Verifier quotes found verbatim in the source | **99.3%** | 99.5% |
-| Time per research run | ~4 min | ~4 min |
+| | Latest, with the name check | Same runs, before it | Previous run |
+|---|---|---|---|
+| Planted false claims caught by the verifier | **96.2%** of 53 | 94.5% of 55 | 87.0% of 54 |
+| · of which swapped names | **83.3%** of 12 | 76.9% of 13 | 78.9% of 19 |
+| True claims wrongly rejected | **0.0%** of 60 | 0.0% of 60 | 0.0% of 60 |
+| Report claims judged grounded by an independent model | **95.0%** of 100 | 94.0% of 100 | 94.0% of 100 |
+| Agreement with 50 hand-labelled claims | **86.0%** (Cohen's κ 0.70) | same | same labels |
+| Verifier quotes found verbatim in the source | **99.3%** | 99.3% | 99.5% |
+| Time per research run | ~4 min | ~4 min | ~4 min |
 
 **Live demo:** https://16.178.82.245.nip.io (sign in with Google to start a run; example reports are public).
 
@@ -83,7 +84,9 @@ flowchart TD
    verifier's quote must actually appear in the cited chunk: normalized exact match, then fuzzy
    match, and *every number in the quote must appear in the source*. If it doesn't, the claim is
    marked unsupported (`verifier quote not found in source`), so the verifier can't hallucinate
-   support either.
+   support either. A second code check covers what a valid quote can't: every **name** in the
+   claim (organisations, countries, acronyms) must appear in the cited text, so "BloombergNEF
+   says…" can't pass on a quote where the IEA says it.
 2. **Isolated judging.** The verifier sees one claim and its cited text, nothing else.
 3. **A real loop with a rule in code** ([`app/graph/rules.py`](app/graph/rules.py)). A
    sub-question with fewer than 2 supported claims goes back to research with a refined query,
@@ -113,18 +116,20 @@ and measures:
 
 Two full runs on the same 24 questions. The latest run uses the final configuration; the previous
 run differs only in how much of each chunk was embedded for retrieval (1,000 vs 2,400 characters),
-which changes the evidence found, not how the verifier judges it.
+which changes the evidence found, not how the verifier judges it. After adding the name check, the
+verifier tests were run again on the latest run's stored research (`--skip-research`): same
+claims, same sources, new verdicts.
 
-| Metric | Latest run | Previous run |
-|---|---|---|
-| Runs completed | 24 / 24 | 24 / 24 |
-| Verifier catch rate, all planted errors | 94.5% of 55 | 87.0% of 54 |
-| · changed number | 100.0% of 12 | 100.0% of 7 |
-| · flipped direction / negation | 100.0% of 19 | 94.7% of 19 |
-| · swapped entity | 76.9% of 13 | 78.9% of 19 |
-| · shifted year | 100.0% of 11 | 77.8% of 9 |
-| Wrongful rejection rate | 0.0% of 60 | 0.0% of 60 |
-| Independent groundedness (Gemini judge) | 94.0% of 100 | 94.0% of 100 |
+| Metric | Latest + name check | Latest run | Previous run |
+|---|---|---|---|
+| Runs completed | 24 / 24 | 24 / 24 | 24 / 24 |
+| Verifier catch rate, all planted errors | 96.2% of 53 | 94.5% of 55 | 87.0% of 54 |
+| · changed number | 100.0% of 12 | 100.0% of 12 | 100.0% of 7 |
+| · flipped direction / negation | 100.0% of 19 | 100.0% of 19 | 94.7% of 19 |
+| · swapped entity | 83.3% of 12 | 76.9% of 13 | 78.9% of 19 |
+| · shifted year | 100.0% of 10 | 100.0% of 11 | 77.8% of 9 |
+| Wrongful rejection rate | 0.0% of 60 | 0.0% of 60 | 0.0% of 60 |
+| Independent groundedness (Gemini judge) | 95.0% of 100 | 94.0% of 100 | 94.0% of 100 |
 | Agreement with hand labels | 86.0% of 50 · κ 0.70 | (same labels) |
 | Drafted claims rejected by the verifier | 7.2% (105 of 1,455) | 7.5% (108 of 1,433) |
 | Runs that looped back to research | 20.8% | 20.8% |
@@ -137,9 +142,17 @@ which changes the evidence found, not how the verifier judges it.
   missed no year or direction changes (the previous run missed 2 and 1). Per-kind samples are small
   (7–19), so treat each figure as an estimate with several points of spread, not an exact value.
 - The verifier is strongest where errors are concrete: changed numbers and flipped directions.
-  **Swapped entities are the clear weak spot** (about 1 in 4 gets through in both runs), and year
-  shifts varied (77.8% → 100%). The next improvement is a deterministic entity/year consistency
-  check in code, like the existing number check.
+  **Swapped entities were the clear weak spot** (about 1 in 4 got through in both runs). The
+  verifier would approve "BloombergNEF says X" with a genuine quote where the IEA says X, and
+  the quote check passed because the quote really was in the source. A **name check in code**
+  ([`missing_names`](app/tools/quote_match.py)) now requires every name in a claim to appear in
+  its cited text. Re-measured on the same stored research: swapped names caught 76.9% → 83.3%,
+  all planted errors 94.5% → 96.2%, with **no** true claims wrongly rejected (0 of 60).
+- Before turning it on, the rule was run over all 2,918 claims the verifier had approved: it
+  flags 1.2%. Most are genuine misses where the claim names something the cited chunk doesn't
+  (an attribution or a place taken from elsewhere on the page); a few are edge cases such as a
+  name cut off at a chunk boundary. Swaps it can't catch are those to a name the same source
+  also mentions, and two-letter acronyms that happen to match word initials.
 - Against the hand labels, 6 of the 7 disagreements are the verifier being *more lenient* than a
   human, mostly on claims it marked "partial". Partial claims are shown with a warning marker in
   reports for this reason.

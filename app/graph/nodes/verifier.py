@@ -11,7 +11,7 @@ from app.graph.state import ResearchState
 from app.llm import LlmOutputError
 from app.models import Claim, EvidenceChunk, Verdict
 from app.prompts import load_prompt
-from app.tools.quote_match import quote_in_chunk
+from app.tools.quote_match import missing_names, quote_in_chunk
 
 QUOTE_NOT_FOUND = "verifier quote not found in source"
 
@@ -19,7 +19,7 @@ QUOTE_NOT_FOUND = "verifier quote not found in source"
 async def verify_claim(
     deps: Deps, run_id: str | None, claim_text: str, source_text: str
 ) -> tuple[VerdictOutput, bool]:
-    """LLM verdict + deterministic quote check. Shared by the graph and the eval probes.
+    """LLM verdict + deterministic quote and name checks. Shared by the graph and the eval probes.
 
     Returns the final verdict and whether the quote was found in the source text.
     """
@@ -37,6 +37,9 @@ async def verify_claim(
     found = quote_in_chunk(out.quote, source_text, deps.settings.quote_match_threshold)
     if out.label != "unsupported" and not found:
         out = VerdictOutput(label="unsupported", quote=out.quote, reason=QUOTE_NOT_FOUND)
+    if out.label != "unsupported" and (names := missing_names(claim_text, source_text)):
+        reason = f"names {', '.join(names)}, which the source text doesn't mention"
+        out = VerdictOutput(label="unsupported", quote=out.quote, reason=reason)
     return out, found
 
 

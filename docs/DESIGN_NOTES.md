@@ -14,6 +14,14 @@ Short notes on the choices that shape DeepDive, and why.
   similar and would pass. The fuzzy fallback may not change meaning: every quoted word must occur
   in the matched source passage, with the same negations ("was not effective" never matches "was
   effective"). A failed check turns the verdict into `unsupported`.
+- **Names are checked in code too.** A valid quote only proves the quote is in the source; the
+  claim can still name someone else ("BloombergNEF says…" approved on a quote where the IEA says
+  it), which is how 1 in 4 swapped entities got through. `missing_names` requires every name in
+  the claim to appear in the cited text: capitalized words after the first, acronyms, and a first
+  word that is clearly a name. It accepts forms of the same name (China/Chinese, RBI/Reserve Bank
+  of India, US/U.S., Fed/Federal Reserve) and ignores months, currencies, units and company
+  suffixes, which an earlier version flagged in 2% of approved claims. A missing name turns the
+  verdict into `unsupported` with the name as the reason.
 - **Fail closed.** An unparseable verifier reply rejects that claim instead of passing it.
 - **Cross-family verifier.** The drafter and verifier come from different model families
   (`openai/*` vs `anthropic/*`), enforced by a settings validator, so a model doesn't approve
