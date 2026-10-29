@@ -87,6 +87,19 @@
       <button class="secondary outline" onclick="window.print()">Save as PDF</button>
       <a href="/runs/{{ run.id }}/trail" role="button" class="secondary outline">Audit trail</a>
     </div>
+    {% if is_owner and run.status == "completed" and not run.is_example %}
+    <form method="post" action="/runs/{{ run.id }}/share" class="share-box">
+      <input type="hidden" name="back" value="{{ request.url.path }}">
+      {% if run.is_shared %}
+        <p class="share-note">Anyone with the link can read this report and its audit trail. Your follow-ups stay private.</p>
+        <button type="button" class="secondary outline" onclick="navigator.clipboard.writeText(location.origin + '/runs/{{ run.id }}').then(() => { this.textContent = 'Link copied' })">Copy link</button>
+        <button name="make" value="0" class="secondary outline">Stop sharing</button>
+      {% else %}
+        <button name="make" value="1" class="secondary outline">Share link</button>
+        <p class="share-note">Lets anyone with the link read this report, without signing in.</p>
+      {% endif %}
+    </form>
+    {% endif %}
   </aside>
 </div>
 {% endif %}

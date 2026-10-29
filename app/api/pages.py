@@ -5,12 +5,12 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
-from app.api.auth import admin_user, can_view, session_user
+from app.api.auth import admin_user, can_view, safe_next, session_user
 from app.api.followup_views import followup_trail, followups_view, paragraph_view
 from app.api.followups import NOT_YOURS, followup_refusal, followups_left
 from app.api.quota import quota_for, start_refusal
@@ -185,9 +185,14 @@ def run_page(run_id: str, request: Request):
         run = _visible_run(session, run_id, request)
         view = _report_view(session, run) if run.status == "completed" else None
         fu = _followup_context(session, run, request)
-    return templates.TemplateResponse(
-        request, "run.html", {"run": run, "view": view, "fu": fu, "duration": duration(run)}
-    )
+    context = {"run": run, "view": view, "fu": fu, "duration": duration(run)}
+    context["is_owner"] = _is_owner(run, request)
+    return templates.TemplateResponse(request, "run.html", context)
+
+
+def _is_owner(run: Run, request: Request) -> bool:
+    user = session_user(request)
+    return user is not None and run.user_id == user["id"]
 
 
 def _followup_context(session, run: Run, request: Request) -> dict | None:
@@ -297,7 +302,26 @@ def report_page(run_id: str, request: Request, fragment: bool = False):
         view = _report_view(session, run)
         fu = _followup_context(session, run, request)
     template = "_report_body.html" if fragment else "report.html"
-    return templates.TemplateResponse(request, template, {"run": run, "view": view, "fu": fu})
+    context = {"run": run, "view": view, "fu": fu, "is_owner": _is_owner(run, request)}
+    return templates.TemplateResponse(request, template, context)
+
+
+@router.post("/runs/{run_id}/share")
+def share_report(
+    run_id: str, request: Request, make: str = Form("1"), back: str = Form("")
+) -> RedirectResponse:
+    """Turn a report's share link on or off. Only its owner can, and only once it's finished."""
+    with _deps(request).session_factory() as session:
+        run = session.get(Run, run_id)
+        if run is None or not _is_owner(run, request):
+            raise HTTPException(status_code=404, detail="run not found")
+        if run.status != "completed":
+            raise HTTPException(status_code=400, detail="only finished reports can be shared")
+        run.is_shared = make == "1"
+        session.add(run)
+        session.commit()
+    target = safe_next(back) if back else f"/runs/{run_id}/report"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/runs/{run_id}/followups", response_class=HTMLResponse)

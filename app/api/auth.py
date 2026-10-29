@@ -73,7 +73,9 @@ def admin_user(request: Request) -> User | None:
 
 
 def can_view(run: Run, user: dict | None, admin: bool = False) -> bool:
-    return admin or run.is_example or (user is not None and run.user_id == user["id"])
+    if admin or run.is_example or run.is_shared:
+        return True
+    return user is not None and run.user_id == user["id"]
 
 
 def safe_next(path: str | None) -> str:

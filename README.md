@@ -22,6 +22,10 @@ often doesn't say what the sentence claims. DeepDive's focus is making the citat
 
 **Live demo:** https://16.178.82.245.nip.io (sign in with Google to start a run; example reports are public).
 
+Every report can be **saved as a PDF** or **shared by link**: the owner turns on a share link and
+anyone with it can read the report and its audit trail without signing in (follow-up questions
+stay private).
+
 ## How the agents cooperate
 
 ```mermaid
@@ -185,7 +189,7 @@ GitHub Actions → ECR → EC2 (deploy through SSM, no SSH), with Caddy for HTTP
 authenticates with an OIDC role when available; on the AWS free plan (no IAM identity providers)
 it falls back to a deploy-only IAM user whose key can only push to this repository and send
 commands to this one instance. Starting a run needs Google sign-in, each user sees only their own runs (plus public example
-reports), each account gets 5 free reports (failed runs don't count), and an hourly run limit
+reports and reports someone shared by link), each account gets 5 free reports (failed runs don't count), and an hourly run limit
 caps cost. Step-by-step: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Project layout

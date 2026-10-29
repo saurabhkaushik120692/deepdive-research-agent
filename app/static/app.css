@@ -355,6 +355,10 @@ details#live .three-col { gap: 1.25rem; }
 .sources li { margin-bottom: 0.35rem; }
 .sources .url { display: block; word-break: break-all; font-size: 0.75rem; }
 
+.share-box { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+.share-box button { width: 100%; margin: 0; }
+.share-note { font-size: 0.78rem; color: var(--dd-muted); margin: 0; line-height: 1.4; }
+
 /* Follow-up questions under the report. */
 .followups { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--dd-line); }
 .followups h2 { margin-top: 0; }

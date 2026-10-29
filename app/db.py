@@ -24,6 +24,7 @@ _ADDED_COLUMNS = {
         "user_id": "INTEGER REFERENCES user (id)",
         "is_example": "BOOLEAN NOT NULL DEFAULT 0",
         "is_featured": "BOOLEAN NOT NULL DEFAULT 0",
+        "is_shared": "BOOLEAN NOT NULL DEFAULT 0",
     },
     "user": {
         "blocked": "BOOLEAN NOT NULL DEFAULT 0",
