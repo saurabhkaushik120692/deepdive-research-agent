@@ -28,6 +28,7 @@ from app.models import (
     Verdict,
 )
 from app.report import Citations
+from app.tools.chunking import strip_controls
 from app.tools.tiers import TIER_LABELS
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,6 +77,8 @@ def duration(run: Run) -> str:
 
 
 templates.env.filters["ago"] = time_ago
+# Reports stored before strip_controls existed can hold control characters; clean every value.
+templates.env.finalize = lambda v: strip_controls(v) if isinstance(v, str) else v
 templates.env.globals["tier_labels"] = TIER_LABELS
 templates.env.globals["is_admin"] = lambda request: admin_user(request) is not None
 

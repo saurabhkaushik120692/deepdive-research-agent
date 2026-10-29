@@ -23,7 +23,7 @@ async def test_research_stores_sources_with_tiers_and_chunks(deps, run, sq):
         SearchResult("https://www.iea.org/r", "IEA", "word " * 900),
         SearchResult("https://blog.example.com/p", "Blog", None),
     ]
-    deps.fetcher.pages["https://blog.example.com/p"] = "blog text " * 300
+    deps.fetcher.pages["https://blog.example.com/p"] = "blog page " * 300
     out = await research_node({"run_id": run.id, "sub_question_id": sq.id, "round": 0}, cfg(deps))
     assert out == {"researched": [sq.id]}
     tiers = sorted(s.tier for s in all_sources(deps, run.id))
