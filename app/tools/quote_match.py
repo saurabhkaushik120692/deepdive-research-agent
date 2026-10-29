@@ -75,6 +75,35 @@ def quote_in_chunk(quote: str, chunk: str, threshold: int = 90) -> bool:
     return _negations(qw) == _negations(window)
 
 
+# --- claim numbers --------------------------------------------------------------------------
+# The quote check looks at the numbers in the verifier's quote. A claim can still state a
+# different figure or year than the quote it was approved on ("rose 32%" on a quote saying 28%),
+# so every number in the claim must appear in the cited text too.
+
+# Not a number inside a code: FY26, CO2, Li2O, Q1.
+_CLAIM_NUMBER = re.compile(r"(?<![a-z0-9.,])\d+(?:[.,]\d+)*")
+_THOUSANDS = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?")
+
+
+def _canonical(number: str) -> str:
+    """1,100 and 1100 are the same figure, and so are 6.0 and 6."""
+    if _THOUSANDS.fullmatch(number):
+        number = number.replace(",", "")
+    if "." in number:
+        number = number.rstrip("0").rstrip(".")
+    return number
+
+
+def missing_numbers(claim: str, source: str) -> list[str]:
+    """Numbers in the claim that the source text doesn't contain, each once, in claim order."""
+    have = {_canonical(n) for n in NUMBER.findall(normalize(source))}
+    missing: list[str] = []
+    for n in _CLAIM_NUMBER.findall(normalize(claim)):
+        if _canonical(n) not in have and n not in missing:
+            missing.append(n)
+    return missing
+
+
 # --- names --------------------------------------------------------------------------------------
 # The quote check proves the verifier's quote is in the source; it can't tell that the CLAIM
 # names someone else ("BloombergNEF says..." approved with a quote saying "the IEA says...").

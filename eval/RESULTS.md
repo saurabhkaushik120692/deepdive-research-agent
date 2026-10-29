@@ -1,28 +1,28 @@
 # DeepDive self-evaluation results
 
-Generated 2026-10-28 04:34 UTC on 24 questions from `eval/questions.jsonl`.
+Generated 2026-10-29 05:13 UTC on 24 questions from `eval/questions.jsonl`.
 
 | Metric | Value |
 |---|---|
 | Runs completed | 24 / 24 |
-| Verifier catch rate (planted false claims) | 96.2% of 53 |
-|   · catch rate: entity | 83.3% of 12 |
-|   · catch rate: negation | 100.0% of 19 |
-|   · catch rate: number | 100.0% of 12 |
-|   · catch rate: year | 100.0% of 10 |
+| Verifier catch rate (planted false claims) | 94.7% of 57 |
+|   · catch rate: entity | 95.0% of 20 |
+|   · catch rate: negation | 94.1% of 17 |
+|   · catch rate: number | 100.0% of 8 |
+|   · catch rate: year | 91.7% of 12 |
 | Wrongful rejection rate (re-verified supported claims) | 0.0% of 60 |
-| Probe / judge calls that errored (excluded from the rates above) | 1 / 0 |
-| Independent groundedness (judge: google/gemini-2.5-flash-lite) | 95.0% of 100 |
+| Probe / judge calls that errored (excluded from the rates above) | 0 / 0 |
+| Independent groundedness (judge: google/gemini-2.5-flash-lite) | 97.0% of 100 |
 | Agreement with hand labels (accuracy) | 86.0% of 50 |
 | Agreement with hand labels (Cohen's kappa) | 0.70 |
 | Quote validity rate | 99.3% |
-| Drafted claims supported / partial / rejected | 1201 / 149 / 105 of 1455 |
-| Draft claims rejected by verifier | 7.2% |
-| Report paragraphs dropped for citing unverified claims | 17 |
-| Runs that looped back to research | 20.8% |
-| Mean extra research rounds | 0.29 |
-| Sub-questions with enough verified support | 99.1% of 112 |
-| Latency per run (p50 / p95, s) | 251 / 353 |
+| Drafted claims supported / partial / rejected | 1156 / 155 / 165 of 1476 |
+| Draft claims rejected by verifier | 11.2% |
+| Report paragraphs dropped for citing unverified claims | 29 |
+| Runs that looped back to research | 37.5% |
+| Mean extra research rounds | 0.50 |
+| Sub-questions with enough verified support | 99.1% of 109 |
+| Latency per run (p50 / p95, s) | 211 / 392 |
 
 ## What these numbers mean
 

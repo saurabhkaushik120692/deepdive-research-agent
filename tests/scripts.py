@@ -27,7 +27,7 @@ LETTERS = ("A", "B", "C")
 def _page(letter: str, round_: int) -> str:
     return (
         f"Evidence for {letter} round {round_}: analysts reported two separate findings about "
-        f"topic {letter}, the first on supply and the second on prices. The report describes "
+        f"topic {letter}, fact 1 on supply and fact 2 on prices. The report describes "
         f"its method, the period covered and the organisations that contributed data."
     )
 

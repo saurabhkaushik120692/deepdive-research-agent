@@ -1,0 +1,113 @@
+{
+  "generated_at": "2026-10-29 05:02 UTC",
+  "n_questions": 24,
+  "models": {
+    "planner": "openai/gpt-5-nano",
+    "drafter": "openai/gpt-5-nano",
+    "verifier": "anthropic/claude-haiku-5.5",
+    "synthesizer": "openai/gpt-5-nano",
+    "contradictions": "openai/gpt-5-nano",
+    "embed": "google/embeddinggemma-300m",
+    "judge": "google/gemini-2.5-flash-lite"
+  },
+  "runs": {
+    "total": 24,
+    "completed": 24,
+    "failed": 0,
+    "failed_ids": []
+  },
+  "claims": {
+    "drafted": 1476,
+    "supported": 1156,
+    "partial": 155,
+    "unsupported": 165,
+    "draft_supported_rate": 0.7831978319783198,
+    "draft_rejected_rate": 0.11178861788617886,
+    "report_paragraphs_dropped": 29
+  },
+  "loops": {
+    "runs_with_loop_rate": 0.375,
+    "mean_extra_rounds": 0.5
+  },
+  "coverage": {
+    "sub_questions": 109,
+    "ok_rate": 0.9908256880733946
+  },
+  "quote_validity_rate": 0.9926090169992609,
+  "cost": {
+    "per_run_usd": {
+      "mean": 0.03762348541666667,
+      "p50": 0.037862375000000004,
+      "p95": 0.05642283999999998
+    },
+    "total_usd": 0.9029636500000003,
+    "unpriced_runs": 0
+  },
+  "latency_s": {
+    "mean": 253.486461625,
+    "p50": 211.239463,
+    "p95": 391.94000595
+  },
+  "tokens": {
+    "prompt": 3025079,
+    "completion": 1484467
+  },
+  "verifier_probe": {
+    "n_originals": 60,
+    "errors": 0,
+    "wrongful_rejection_rate": 0.0,
+    "n_mutants": 57,
+    "catch_rate": 0.9122807017543859,
+    "catch_rate_by_kind": {
+      "entity": 0.95,
+      "negation": 0.9411764705882353,
+      "number": 0.875,
+      "year": 0.8333333333333334
+    },
+    "n_mutants_by_kind": {
+      "entity": 20,
+      "negation": 17,
+      "number": 8,
+      "year": 12
+    },
+    "examples": [
+      {
+        "kind": "number",
+        "mutant": "AI workloads drive the surge, with AI-optimised servers projected to grow faster, including ~60% per year growth in some statements.",
+        "label": "partial"
+      },
+      {
+        "kind": "year",
+        "mutant": "The United States added 34 GW of solar PV capacity in 2022.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "negation",
+        "mutant": "Global total semiconductor equipment sales are not forecast to reach $125.5 billion in 2025.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "negation",
+        "mutant": "High manufacturing costs are not a key restraint in the solid-state battery market.",
+        "label": "unsupported"
+      },
+      {
+        "kind": "number",
+        "mutant": "As of 2026, LFP cells cost approximately $116-$100 per kWh.",
+        "label": "unsupported"
+      }
+    ]
+  },
+  "independent_judge": {
+    "model": "google/gemini-2.5-flash-lite",
+    "n": 100,
+    "errors": 0,
+    "groundedness": 0.97
+  },
+  "gold": {
+    "n_labelled": 50,
+    "accuracy": 0.86,
+    "kappa": 0.7028862478777589
+  },
+  "eval_cost_usd": 0.05450609999999996
+}

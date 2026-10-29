@@ -22,6 +22,12 @@ Short notes on the choices that shape DeepDive, and why.
   of India, US/U.S., Fed/Federal Reserve) and ignores months, currencies, units and company
   suffixes, which an earlier version flagged in 2% of approved claims. A missing name turns the
   verdict into `unsupported` with the name as the reason.
+- **And so are the claim's numbers.** The quote check only covers the numbers in the quote, so a
+  claim stating 32% could pass on a quote saying 28%. `missing_numbers` requires every figure and
+  year in the claim to appear in the cited text; "1,100" matches "1100" and "6.0" matches "6",
+  and numbers inside codes (FY26, CO2, Li2O, Q1) are skipped. The fresh 29 Oct eval found this
+  gap (one changed number and two shifted years got through); with the check, changed numbers
+  are caught 100% and shifted years 91.7%, with no true claims wrongly rejected.
 - **Garbled pages are cleaned.** Some pages store curly quotes and dashes as control characters
   (`RBI\x19s`); they become punctuation when fetched, and every page also cleans text on display,
   so reports saved earlier read correctly. The bytes of a PDF read as text (many j/q/x/z letters,
